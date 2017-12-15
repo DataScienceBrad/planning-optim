@@ -1,0 +1,140 @@
+---
+title: 'Planification Automatique de Vacations'
+author: 'Marc Faddoul pour le groupe du Mail'
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  pdf_document:
+    fig_crop: false
+    keep_tex: true
+
+geometry: margin=3cm
+---
+
+
+
+
+\newpage
+
+
+# Contexte de l'étude et motivation
+
+Le groupe du mail est un cabinet de radiologie où travaillent une trentaine de radiologues. Pour effectuer une vacation, un radiologue doit s'être vu attribué l'un des 29 postes de travail du groupe.
+
+Un planning des vacations est donc nécessaire pour définir l'attribution des postes aux radiologues. Ce planning doit respecter un nombre de contraintes rigides. Par exemple, chaque radiologue doit effectuer un nombre minimum de vacations dans l'année. Par ailleurs, il existe un certain nombre de préférences, ou contraintes flexible. Chaque radiologue a notamment ses jours de congé préférés.
+
+Réaliser un bon planning consiste donc à proposer un emploi du temps qui vérifie toute les contraintes rigides et un maximum de contraintes flexibles.
+
+Jusqu'à présent, le planning est réalisé de manière manuelle par un radiologue du groupe expert en la matière. Le résultat apporte satisfaction, cependant il existe certains inconvénients à cette méthode:
+
+- La réalisation manuelle d'un emploi du temps est chronophage.
+- Pour réaliser ce genre de tâche, l'homme doit raisonner par tâtonnement. Cette démarche ne peut pas garantir une transparence totale du processus, car des choix arbitraires doivent être réalisés à chaque étape.
+-  Une seule personne est aujourd'hui capable de réaliser les emplois du temps au sein du groupe. Si pour une raison quelconque cette personne n'était plus en mesure de le faire, le groupe pourrait faire face à des problèmes logistiques.
+
+Cette tâche étant hautement automatisable, la présente étude vise à prototyper un outil de génération du planning des vacations.
+
+L'outil devra répondre respecter le cahier des charges suivant:
+
+- Génération rapide du planning: après avoir entré quelques paramètres, l'outil calcule le planning de manière quasi instantanée.
+- L'algorithme suivra des règles de calcul bien définies et connues de tous, pour permettre une transparence totale du processus.
+- Enfin, l'algorithme fonctionnera grâce à des techniques d'optimisation qui permettent de trouver la *meilleure* solution au problème, chose qui est quasi impossible à la main. Ici, *meilleure* signifie qui maximise le respect des contraintes flexibles. Nous reviendrons sur cette définition dans les détails de l'algorithme.
+- L'algorithme tâchera d'être équitable entre les radiologues lorsqu'il s'agit de contrarier les préférences des uns et des autres.
+- La numérisation de ce processus permettra de garder un meilleur suivi de l'historique des vacations. Ainsi, on pourra accéder rapidement au nombre de vacations effectuées ou au nombre de préférences non exaucées par radiologue sur une période donnée.
+
+En théorie donc, si l'on défini correctement toutes les contraintes qui régissent la planification des vacations, on doit pouvoir générer une solution optimale.
+
+Cependant, personne n'est indifférent au fait que de nombreuses raisons peuvent perturber ces règles rigides, tant dues à des facteurs humains qu'à des évènements intempestifs.
+
+Aussi, le système devra rester souple est permettre la modification manuelle de la solution proposée. Pour le moins dans un premier temps, l'objectif est de proposer une base d'emploi du temps avec le gros du travail déjà fait, qui puisse ensuite être peaufinée manuellement par un opérateur.
+
+# Séparation du processus en deux phases
+
+Pour résoudre le problème nous le séparons en deux phases. Dans un premier temps, on réalisera un planning à l'échelle journalière: on ne fait donc qu'attribuer les jours de travail et de repos de chacun.
+
+Dans une seconde phase, on attribuera chaque vacation individuellement parmi les radiologues actifs le jour concerné.
+
+En plus de diminuer la complexité du problème algorithmique, cela permet de couper l'étude en deux. Ainsi, la seconde phase sera lancée sous réserve de la réussite de la première.
+
+Du point de vue des résultats, une optimisation en deux temps peut apporter théoriquement une solution moins bonne. (c'est à dire avec moins de contraintes flexibles respectées)
+En pratique, étant donné la structure très linéaire du problème, la différence devrait être négligeable voir inexistante.
+
+Il existe par ailleurs de grandes similarités entre les deux problèmes. Une partie du code pourra donc être réutilisée dans la seconde phase.
+
+**Dans tous ce qui suit, on traitera du problème de la première phase, c'est à dire l'attribution des jours de travail.**
+
+# Formalisation du problème
+
+Cette partie n'a pas pour but de détailler les technicités de l'outil, mais de présenter son fonctionnement général. Cependant, pour bien comprendre, il est nécessaire d'introduire un peu le contexte théorique.
+
+Pour pouvoir aborder le problème, on commence par introduire une représentation mathématique d'un planning. On peut prendre tout simplement un matrice de 0 et de 1, ou chaque colonne correspond à un jour du calendrier, et chaque ligne à un radiologue.
+Un 1 correspond à un jour travaillé, un zéro à un jour pas travaillé.
+
+Toute matrice de 0 et de 1 ayant autant de lignes que de radiologues et autant de colonnes que de jour dans la période considérée correspond à un unique emploi du temps.
+
+L'ensemble de ces matrices constitue un espace (vectoriel pour ceux à qui ça parle).
+
+Par ailleurs, chaque solution peut respecter ou pas une certaine contrainte, par exemple ne faire travailler personne un jour férié.
+
+On ne s'intéresse qu'aux solutions qui respectent toutes les contraintes rigides définies plus haut. Une telle solution est dite *factible*. Les solutions factibles constituent un sous espace de l'espace initial.
+
+Enfin, on peut attribuer un coût à chaque solution. Ce coût correspond au degré de non-respect des contraintes flexibles. Plus une solution satisfait les préférences des radiologues, plus son coût est faible. On défini donc une fonction mathématique qui associe son coût à chaque solution.
+
+Ainsi posé, le problème se résume à la tâche suivante: **on cherche à minimiser la fonction de coût sur le sous-ensemble des solutions factibles.**
+
+Ce problème est un donc un cas d'école d'optimisation linéaire discrète sous contraintes. (*integer programming* en anglais)
+Il existe de très bon algorithmes qui permettent de résoudre cette famille de problème. Le détail des méthodes de résolution n'est pas présenté dans ce rapport car il n'aide pas à la compréhension du fonctionnement de l'outil et cela fait appel à des concepts mathématique et informatique plus poussés. On retiendra donc seulement que l'on sait minimiser la fonction de coût sur l'espace des solutions.
+
+Il suffit donc désormais de définir formellement les contraintes à respecter, ainsi que la fonction de coût.
+
+# Définition des contraintes
+
+Pour qu'une solution soit acceptable (factible) et donc proposable par l'algorithme, elle doit vérifier strictement les conditions suivantes:
+
+- **Charge de travail totale par radiologue sur la période.** Le nombre de jour travaillé par chaque radiologue doit être contenu dans une certaine fourchette. Cette fourchette dépend bien sûr du statut temps plein, 3/4 ou demi. *à implémenter =>* On peut faire varier cette fourchette en fonction de l'historique. Ainsi, qqun qui a des jours de retard sur une période voit sa fourchette augmentée sur la période suivante ce qui force l'algorithme à le faire travailler plus.
+
+- **Respect du planning de congé.** Le planning des congés annuels de chaque radiologue doit être renseigné sous un certain format dans un classeur Excel. Le programme les prend alors en compte comme une contrainte rigide, à savoir qu'un radiologue n'est jamais mis en poste durant ses congés.
+
+- **Présence minimale hebdomadaire**. Chaque semaine, un minimum de présence générale doit être assuré. Cela vise à éviter que l'algorithme ne propose des solutions particulières ou tout le monde prend tous ses jours de repos la même semaine. La valeur de cette limite inférieur peut être spécifiée semaine par semaine pour prendre en compte les semaines spéciales comme à Noël.
+*Il faut que l'on définisse précisément la valeur de cette limite inf. Pour l'instant je prends 80% du nombre moyen de radiologues en poste*
+
+# Contraintes flexibles et optimalité de la solution
+
+Parmi les solutions vérifiant les contraintes listées ci-dessus, on chercher la meilleure, c'est à dire celle qui vérifiera au mieux les contraintes flexible. C'est la fonction de coût qui nous permet de quantifier le degré qualité.
+
+Dans cette phase, les seules contraintes flexibles correspondent aux jours de repos préférentiels (jours de la semaine) exprimés par chaque radiologue.
+
+Chaque contrainte flexible non-respectée (un mécontentent) augmente la fonction de coût. Ainsi, le coût total est la somme des mécontentements individuels. C'est cette quantité que l'algorithme d'optimisation va minimiser. Cependant, la meilleure solution de ce point de vue là est rarement équitable.
+
+L'algorithme pourra avoir tendance à pénaliser toujours les mêmes personnes dans le but de trouver le minimum de la fonction de cout c'est à dire *le mécontentement général minimal*. Ce n'est pas ce que nous voulons.
+
+Pour contrer ce phénomène, on introduit une facteur de pénalisation individuel pour chaque radiologue. Ainsi, plus le facteur d'un radiologue est élevé, plus la contradiction d'une de ses contraintes coute chère à l'algorithme en terme de mécontentement.
+
+**Ce facteur de pénalisation est calculé en fonction de l'historique des mécontentement subis par chacun.** Ainsi, plus un radiologue a été pénalisé par le passé, plus son facteur sera élevé, et plus l'algorithme aura tendance à l'épargner. Ces facteurs sont recalculés à chaque phase de génération du planning. Deux radiologues n'auront le même facteur que si ils ont été contrariés autant de fois dans l'historique.
+
+Attention, ce système n'implique pas que tous les radiologues aient constamment le même nombre de contrariétés à leur compteur. L'algorithme est obligé de faire des concessions, et il peut couter moins cher de pénaliser un radiologue qui a un facteur élevé que deux ou trois radiologues avec des facteurs faibles.
+
+En revanche, **ce système garantie une équité sur le long terme**. Le système de facteurs de pénalisation est fondé sur tout l'historique, ainsi quelqu'un qui a un score élevé suite à plusieurs contrariété finira par recevoir justice lorsqu'un choix devra être fait entre lui et un radiologue à facteur faible.
+
+Les samedis sont quand à eux attribués de manière aléatoire et indépendante. Le nombre de samedis travaillé est proportionnel au temps de travail (deux fois plus de samedis pour les temps pleins que pour les mi-temps). La méthode de tirage doit permettre de répartir au mieux les samedis dans l'année tout en variant les équipes en poste.
+
+# Fonctionnement de l'algorithme
+
+Pour fonctionner, l'algorithme prend un certain nombre de données en entrée, à savoir:
+
+- La liste des radiologues, avec leur nombre de vacations par an et leurs jours de repos préférentiels.
+
+- Le calendrier des congés de chaque radiologue
+
+Ces données doivent être fournies dans un classeur Excel, sous une forme précise que l'on spécifiera.
+
+
+Par ailleurs, pour faire tourner l'algorithme, on spécifiera les paramètres suivants:
+
+- Le nombre de semaines de planning à générer
+
+- L'historique de planning sur lequel se fonder pour générer les facteurs de pénalisation et le nombre de vacations à effectuer
+
+- Certains paramètres annexes, tels que le rapport entre les facteurs de pénalisation élevés et faibles (ce paramètre contrôle la balance entre équité et maximisation de la somme des intérêts particuliers). Un autre paramètre permet de fixer le pourcentage minimal de présence hebdomadaire par rapport au pourcentage annuel moyen. (80% par défaut)
+
+Dans l'état actuel des choses, le programme nécessite d'être lancé depuis un terminal. Je peux faire tourner des simulations à la demande.
+
+J'étudie très prochainement la possibilité de le packager dans une petite app utilisable chez vous.
