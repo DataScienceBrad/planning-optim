@@ -128,7 +128,7 @@ workload.constraint2 <- function(df, n.week = 8, week.start, work.meter, holiday
 }
 
 # chaque semaine, le nombre total de vacation atribuées doit etre superieur a un seuil
-week.balance.constraint <- function(df, n.week, balance.factor)
+workforce.constraint <- function(df, n.week, workforce.factor)
 {
   n.radiologue = nrow(df)
   calendar.length = n.week * 7
@@ -141,10 +141,13 @@ week.balance.constraint <- function(df, n.week, balance.factor)
     const.matrix = rbind(const.matrix, ith.week.constraint)
   }
   effective.week.workforce = sum(as.numeric(gsub(",",".", df[,"ETP"]))) * 4
-  const.value = rep(floor(effective.week.workforce * balance.factor), n.week)
+  const.value = rep(floor(effective.week.workforce * workforce.factor), n.week)
   const.dir = rep(">=", n.week)
   return(list("const.matrix" = const.matrix, "const.dir" = const.dir, "const.value" = const.value))
 }
+
+# balance constraint a integrer en flexible dans la fonction de cout
+
 
 # SAMEDIS #
 # Recalé jusqu'à nouvel ordre. Assigner les samedi dans un second temps
@@ -226,6 +229,27 @@ cost.vector.rest.days <- function(rest.preferences,
   individual.preferences.matrix = matrix(nrow = 0, ncol = calendar.length * n.radiologue)
   for(i in 1:n.radiologue)
   {
+    individual.interpolation = rep(0, n.radiologue)
+    individual.interpolation[i] = 1
+    individual.interpolation = rep(individual.interpolation, calendar.length)
+    individual.rest.preferences = rest.preferences.cost.vector * individual.interpolation
+    individual.preferences.matrix = rbind(individual.preferences.matrix, individual.rest.preferences)
+  }
+  # Lets generate a random penalty coefficient vector:
+  penalty.coefficients = penalty.vector
+  cost.vector.rest.days = colSums(diag(penalty.coefficients) %*% individual.preferences.matrix)
+  return(cost.vector.rest.days)
+}
+
+cost.vector.week.balance <- function(df,
+                                     n.week)
+{
+  n.radiologue = nrow(df)
+  calendar.length = n.week * 7
+  weekly.load.matrix = matrix(nrow = 0, ncol = calendar.length * n.radiologue)
+  for(i in 1:n.radiologue)
+  {
+  
     individual.interpolation = rep(0, n.radiologue)
     individual.interpolation[i] = 1
     individual.interpolation = rep(individual.interpolation, calendar.length)
@@ -358,7 +382,7 @@ generate.planning <- function(history.vector = 1:29,
                               holiday.file = NA,
                               first.week = 1,
                               holiday.proportion = 0.12,
-                              balance.factor = 0.8)
+                              workforce.factor = 0.8)
 {
     df = extract.data(file.location = dataPlanningFile, saturday.penalty = 2)$df
     rest.preferences = extract.data(file.location = dataPlanningFile, saturday.penalty = 2)$rest.preferences
@@ -385,7 +409,7 @@ generate.planning <- function(history.vector = 1:29,
     }
 
     holiday.constraint = holiday.constraint(holiday.data)
-    balance.constraint = week.balance.constraint(df, n.week, balance.factor = balance.factor)
+    workforce.constraint = week.workforce.constraint(df, n.week, workforce.factor = workforce.factor)
     saturday.constraint = no.saturday.constraint(df, n.week)
     cost.vector = cost.vector.rest.days(rest.preferences,
                                         df,
@@ -398,17 +422,17 @@ generate.planning <- function(history.vector = 1:29,
     }
     const.matrix = rbind(workload.constraint$const.matrix,
                          holiday.constraint$const.matrix,
-                         balance.constraint$const.matrix,
+                         workforce.constraint$const.matrix,
                          saturday.constraint$const.matrix)
 
     const.dir = c(workload.constraint$const.dir,
                   holiday.constraint$const.dir,
-                  balance.constraint$const.dir,
+                  workforce.constraint$const.dir,
                   saturday.constraint$const.dir)
 
     const.val = c(workload.constraint$const.value,
                   holiday.constraint$const.value,
-                  balance.constraint$const.value,
+                  workforce.constraint$const.value,
                   saturday.constraint$const.value)
 
     sol <- planning.solver(cost.vector,
@@ -477,7 +501,7 @@ continue.planning <- function(planning,
                               saturday.penalty = 2,
                               holiday.proportion = 0.12,
                               holiday.data = NA,
-                              balance.factor = 0.8)
+                              workforce.factor = 0.8)
 {
   first.week = (dim(planning)[2] / 7) + 1
   history.vector = current.penalties(planning, rest.preferences)
@@ -491,7 +515,7 @@ continue.planning <- function(planning,
                                          saturday.penalty = saturday.penalty,
                                          holiday.proportion = holiday.proportion,
                                          holiday.data = 0,
-                                         balance.factor = balance.factor)
+                                         workforce.factor = workforce.factor)
   new.planning = cbind(planning, following.planning)
   print(current.penalties(new.planning, rest.preferences))
   return(new.planning)
