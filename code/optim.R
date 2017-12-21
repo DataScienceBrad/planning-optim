@@ -2,24 +2,23 @@ library('lpSolve')
 library('data.table')
 source('planningFeedback.R')
 # parameters
-
+folder = "~/Workspace/planning-optim/"
 # La variable d'optimisation du problème est organisé par jour:
 # Les 29 premiers indices correspondent à la présence de chaque radiologue
 # le premier jour du calendrier considéré, puis les 29 suivant le deuxieme, etc
-extract.data <- function(file.location = "~/Desktop/planningRadio/data/dataPlanning.csv",
-                         saturday.penalty = 0)
+extract.data <- function(file.location = paste(folder, "data/dataPlanning.csv", sep = ''), saturday.penalty = 0)
 {
   # Import and format data for rest day preferences
   df <- read.table(file.location, header = TRUE, sep = ";")
   # use strings instead of factor (the dataset is small)
   df <- data.frame(lapply(df, as.character), stringsAsFactors=FALSE)
   # rest.preferences: 5 colonnes, 29 lignes. Un 1 quand un indice coerrespond a un jour de congé souhaité
-  rest.preferences = matrix(ncol = 6, nrow = 0)
+  rest.preferences = matrix(ncol = 7, nrow = 0)
   # scrape rest days in dataframe and convert into desired format
   for(i in 1:nrow(df))
   {
-    rest.vector = c(rep(0, 5), saturday.penalty)
-    rest.days = paste(df[i, 5], df[i, 6], df[i, 7], sep = '.')
+    rest.vector = c(rep(0, 5), saturday.penalty, 0)
+    rest.days = paste(df[i, 5], df[i, 7], df[i, 7], sep = '.')
     rest.days = strsplit(rest.days, '\\.')
     if('lu' %in% rest.days[[1]]) rest.vector[1] = 1
     if('ma' %in% rest.days[[1]]) rest.vector[2] = 1
@@ -29,13 +28,31 @@ extract.data <- function(file.location = "~/Desktop/planningRadio/data/dataPlann
     rest.preferences = rbind(rest.preferences, rest.vector)
   }
   radiologues = df[, 1]
-  weekdays = c("lu", "ma", "me", "je", "ve", "sa")
+  weekdays = c("lu", "ma", "me", "je", "ve", "sa", "di")
   rownames(rest.preferences) <- radiologues
   colnames(rest.preferences) <- weekdays
   return(list("df" = df, "rest.preferences" = rest.preferences))
 }
 
-extract.holiday.data <- function(file.location = "~/Desktop/planningRadio/data/holidays.csv")
+
+extract.holiday.data <- function(file.location = "../data/conges-calendrier.csv",
+                                 column.range = 4:367,
+                                 row.range = 8:36)
+{
+  # Import and format data for rest day preferences
+  df <- read.table(file.location, sep = ";")
+  # use strings instead of factor (the dataset is small)
+  df <- data.frame(lapply(df, as.character), stringsAsFactors=FALSE)
+  # rest.preferences: 5 colonnes, 29 lignes. Un 1 quand un indice coerrespond a un jour de congé souhaité
+  df <- df[row.range, column.range]
+  # invert 0 and 1 as the convention is opposite is the csv and in the program
+  df = as.data.frame(sapply(df, function(x) abs(as.numeric(x) - 1)))
+  return(df)
+}
+
+
+# depreciated, since we now have a different format for the csv file
+extract.holiday.data2 <- function(file.location = "../data/holidays.csv")
 {
   # Import and format data for rest day preferences
   df <- read.table(file.location, header = TRUE, sep = ";")
@@ -50,7 +67,7 @@ extract.holiday.data <- function(file.location = "~/Desktop/planningRadio/data/h
 
 troncate.holiday.data <- function(holiday.df, start.week, end.week)
 {
-  return(holiday.df[, ((start.week - 1) * 6 + 1):(end.week * 6)])
+  return(holiday.df[, ((start.week - 1) * 7 + 1):(end.week * 7)])
 }
 
 # WORKLOAD #
@@ -71,13 +88,22 @@ troncate.holiday.data <- function(holiday.df, start.week, end.week)
 workload.constraint <- function(df, n.week = 8, overwork.factor = 1)
 {
   n.radiologue = nrow(df)
-  calendar.length = n.week * 6
+  calendar.length = n.week * 7
   const.dir = rep(">=", n.radiologue)
   # valeur des containtes (terme de droite)
   # egal au nombre de jour de boulot a realiser dans le calendrier pour chaque radiologue
   # La division par deux vient du fait qu'on considère 2 vac / jour de boulot
   const.value = floor(overwork.factor * as.numeric(df[, 3]) * n.week / (2 * 52)) + 1
   const.matrix = matrix(rep(diag(1, n.radiologue), calendar.length), n.radiologue, calendar.length * n.radiologue)
+  return(list("const.matrix" = const.matrix , "const.dir" = const.dir, "const.value" = const.value))
+}
+
+saturday.constraint <- function(df, n.week, saturday.frequency = 1 / 5)
+{
+  n.radiologue = nrow(df)
+  const.value = floor( as.numeric(df[, 4]) * n.week / 8 * saturday.frequency)
+  const.dir = rep(">=", n.radiologue)
+  const.matrix = matrix(rep(c(rep(diag(0, n.radiologue), 5), diag(1, n.radiologue), diag(0, n.radiologue)), n.week), n.radiologue)
   return(list("const.matrix" = const.matrix , "const.dir" = const.dir, "const.value" = const.value))
 }
 
@@ -92,10 +118,10 @@ workload.constraint <- function(df, n.week = 8, overwork.factor = 1)
 workload.constraint2 <- function(df, n.week = 8, week.start, work.meter, holiday.data, first.week)
 {
   n.radiologue = nrow(df)
-  calendar.length = n.week * 6
+  calendar.length = n.week * 7
   const.dir = rep(">=", n.radiologue)
   # valeur des containtes (terme de droite)
-  total.workloard = floor(as.numeric(df[, 3]) * dim(holiday.data)[2] / (6 * 52))
+  total.workloard = floor(as.numeric(df[, 3]) * dim(holiday.data)[2] / (7 * 52))
   total.target.workload = (year.workload * n.week / (2 * 52) ) + 1
   const.matrix = matrix(rep(diag(1, n.radiologue), calendar.length), n.radiologue, calendar.length * n.radiologue)
   return(list("const.matrix" = const.matrix , "const.dir" = const.dir, "const.value" = const.value))
@@ -105,13 +131,13 @@ workload.constraint2 <- function(df, n.week = 8, week.start, work.meter, holiday
 week.balance.constraint <- function(df, n.week, balance.factor)
 {
   n.radiologue = nrow(df)
-  calendar.length = n.week * 6
+  calendar.length = n.week * 7
 
   const.matrix = c()
   for(i in 1:n.week)
   {
     ith.week.constraint = rep(0, n.radiologue * calendar.length)
-    ith.week.constraint[((i - 1) * 6 * n.radiologue + 1):(i * 6 * n.radiologue)] = rep(1, 6)
+    ith.week.constraint[((i - 1) * 7 * n.radiologue + 1):(i * 7 * n.radiologue)] = rep(1, 7)
     const.matrix = rbind(const.matrix, ith.week.constraint)
   }
   effective.week.workforce = sum(as.numeric(gsub(",",".", df[,"ETP"]))) * 4
@@ -135,13 +161,12 @@ no.saturday.constraint <- function(df, n.week)
   saturday.const.matrix = c()
   for(i in 1:n.week)
   {
-    ith.saturday.vector = rep(0, n.radiologue * 6 * n.week)
-    ith.saturday.vector[(n.radiologue * 6 * (i-1) + n.radiologue * 5 + 1):(n.radiologue * 6 * i)] = rep(1, n.radiologue)
+    ith.saturday.vector = rep(0, n.radiologue * 7 * n.week)
+    ith.saturday.vector[(n.radiologue * 7 * (i-1) + n.radiologue * 5 + 1):(n.radiologue * 7 * i)] = rep(1, n.radiologue)
     saturday.const.matrix = c(saturday.const.matrix, ith.saturday.vector)
   }
   saturday.const.matrix = matrix(saturday.const.matrix, nrow = n.week, byrow = TRUE)
   return(list("const.matrix" = saturday.const.matrix, "const.dir" = saturday.total.const.dir, "const.value" = saturday.total.const.value))
-
   # De plus, chacun doit travailler au minimum un nombre de samedi donné, proportionnel à sa charge hebdomadaire
   # Il est préférable de gérer les samedis dans un second temps, après l'optimisation
   # En effet, effectuer un samedi est une assignation sans préférence et sans influence
@@ -151,10 +176,10 @@ no.saturday.constraint <- function(df, n.week)
 
 generate.random.holiday.data <- function(df,
                                          n.week,
-                                         holiday.proportion = 6 / 52)
+                                         holiday.proportion = 7 / 52)
 {
   n.radiologue = nrow(df)
-  calendar.length = n.week * 6
+  calendar.length = n.week * 7
 
   holiday = matrix(rep(0, n.radiologue * calendar.length), nrow = n.radiologue)
   for(r in 1:n.radiologue)
@@ -170,13 +195,13 @@ generate.random.holiday.data <- function(df,
   radiologues = df[, 1]
   weekdays = c("lu", "ma", "me", "je", "ve", "sa")
   rownames(holiday) <- radiologues
-  colnames(holiday) <- rep(weekdays, dim(holiday)[2] / 6)
+  colnames(holiday) <- rep(weekdays, dim(holiday)[2] / 7)
   return(holiday)
 }
 
-holiday.constraint <- function(holiday.data)
+holiday.constraint <- function(holiday.data, n.week)
 {
-  const.matrix = as.numeric(unlist(c(holiday.data)))
+  const.matrix = matrix(as.numeric(unlist(c(holiday.data))), 1)
   return(list("const.matrix" = const.matrix,
               "const.dir" = c("=="),
               "const.value" = c(0)))
@@ -196,7 +221,7 @@ cost.vector.rest.days <- function(rest.preferences,
                                   n.week)
 {
   n.radiologue = nrow(df)
-  calendar.length = n.week * 6
+  calendar.length = n.week * 7
   rest.preferences.cost.vector = rep(c(rest.preferences), n.week)
   individual.preferences.matrix = matrix(nrow = 0, ncol = calendar.length * n.radiologue)
   for(i in 1:n.radiologue)
@@ -220,37 +245,38 @@ cost.vector.rest.days <- function(rest.preferences,
 # induces a cost of c1 for a false positive (canceling a scheduled working day)
 # as an oppotunity cost (ie 0 if we cancel -c1 if we don't cancel)
 # and a direct cost of c2 if we plan someone who was not suppose to work
-# pre.planned.length: number of days to take into account. Usually N - 6.
+# pre.planned.length: number of days to take into account. Usually N - 7.
 # ex: we wanna plan the next 8 week and we have the 7 first weeks pre-planned
 # The ratio c1 over c2 allows to control for the importance of false negative as compared to false positive
 cost.vector.changes <- function(pre.planned.sol,
-                                pre.planned.length = dim(pre.planned.sol)[2] - 6, #take into account N-1 weeks
+                                pre.planned.length = dim(pre.planned.sol)[2] - 7, #take into account N-1 weeks
                                 n.week,
                                 first.week = 1,
                                 c1 = 5,
                                 c2 = 2)
 {
-      pre.planned.vector = c(pre.planned.sol[, ((first.week - 1) * 6 + 1):(pre.planned.length + (first.week - 1) * 6)])
+      pre.planned.vector = c(pre.planned.sol[, ((first.week - 1) * 7 + 1):(pre.planned.length + (first.week - 1) * 7)])
       pre.planned.vector = Reduce(c, pre.planned.vector)
       cost.vector.changes = rep(c2, pre.planned.length * dim(pre.planned.sol)[1]) - (c1 + c2) * pre.planned.vector
-      cost.vector.changes = c(cost.vector.changes, rep(0, n.week * 6 * dim(pre.planned.sol)[1] - length(pre.planned.vector)))
+      cost.vector.changes = c(cost.vector.changes, rep(0, n.week * 7 * dim(pre.planned.sol)[1] - length(pre.planned.vector)))
       return(cost.vector.changes)
 }
 
-planning.solver <- function(cost.function,
+planning.solver <- function(cost.vector,
                             const.matrix,
                             const.dir,
-                            const.value,
+                            const.val,
                             num.bin.solns)
 {
-  sol = lp(objective.in = cost.function,
+  sol = lp(objective.in = cost.vector,
            direction = "min",
            const.mat = const.matrix,
            const.dir = const.dir,
-           const.rhs = const.value,
+           const.rhs = const.val,
            all.bin = TRUE,
            compute.sens = 1,
-           num.bin.solns = num.bin.solns)
+           num.bin.solns = num.bin.solns,
+           use.rw = TRUE)
   return(sol)
 }
 
@@ -260,11 +286,11 @@ format.planning <- function(sol, df, sol.number = 1)
   number.of.solution =  sol$num.bin.solns
   solution.length = (length(sol$solution)) / number.of.solution ## il y avait un -1 bizare qui a ete supprime
   radiologues = df[, 1]
-  weekdays = c("lu", "ma", "me", "je", "ve", "sa")
+  weekdays = c("lu", "ma", "me", "je", "ve", "sa", "di")
   solution.vector = sol$solution[((sol.number - 1) * solution.length + 1):(sol.number * solution.length)]
   sol.planning = matrix(solution.vector, nrow = length(radiologues), byrow = FALSE)
   rownames(sol.planning) <- radiologues
-  colnames(sol.planning) <- rep(weekdays, dim(sol.planning)[2] / 6)
+  colnames(sol.planning) <- rep(weekdays, dim(sol.planning)[2] / 7)
   return(sol.planning)
 }
 
@@ -293,7 +319,7 @@ most.weekly.spread.conflicts <- function(sol, df, rest.preferences)
 {
   number.of.solution = sol$num.bin.solns
   best = Inf
-  n.week = dim(format.planning(sol, df, 1))[2] / 6
+  n.week = dim(format.planning(sol, df, 1))[2] / 7
   best.sol.indice = 0
   for(i in 1:number.of.solution)
   {
@@ -302,7 +328,7 @@ most.weekly.spread.conflicts <- function(sol, df, rest.preferences)
     sol.mat = conflict(sol.mat, rest.preferences)
     for(w in 1:n.week)
     {
-      weekly.conflicts = sum(colSums(sol.mat[, (1 + (w-1) * 6):(w * 6)]))
+      weekly.conflicts = sum(colSums(sol.mat[, (1 + (w-1) * 7):(w * 7)]))
       vect = c(vect, weekly.conflicts)
     }
     concentration = sd(vect)
@@ -320,23 +346,22 @@ generate.planning <- function(history.vector = 1:29,
                               num.bin.solns = 100,
                               sol.number = 0, #when = 0 uses most_weekly_spread_conflicts
                               return.full.sol = FALSE,
-                              df = extract.data(file.location = "~/Desktop/planningRadio/data/dataPlanning.csv",
-                                                saturday.penalty = 2)$df,
-                              rest.preferences = extract.data(file.location = "~/Desktop/planningRadio/data/dataPlanning.csv",
-                                                              saturday.penalty = 2)$rest.preferences,
+                              dataPlanningFile = paste(folder, "data/dataPlanning.csv", sep = ''),
                               penalty.factor = 2, # penalty factor for preferences between first and last group
                               pre.planned = NA,
-                              pre.planned.length = dim(pre.planned)[2] - 6, # number of days to take into account
+                              pre.planned.length = dim(pre.planned)[2] - 7, # number of days to take into account
                               c1 = -500, # cost for false positive
                               c2 = -200, # cost for false negative
                               number.of.groups = 4, # number of groups in penalty
                               overwork.factor = 1.1, # effective work as compared to required
                               saturday.penalty = 2,
-                              holiday.data = NA,
+                              holiday.file = NA,
                               first.week = 1,
                               holiday.proportion = 0.12,
                               balance.factor = 0.8)
 {
+    df = extract.data(file.location = dataPlanningFile, saturday.penalty = 2)$df
+    rest.preferences = extract.data(file.location = dataPlanningFile, saturday.penalty = 2)$rest.preferences
     # penalty.vector = generate.penalty.vector(history.vector, penalty.factor, number.of.groups)
     # alternate caluculation for penalty vector:
     penalty.vector = ((history.vector + 1) * penalty.factor) ^ 2  / ((max(history.vector + 1) * penalty.factor) ^ 2)
@@ -363,9 +388,9 @@ generate.planning <- function(history.vector = 1:29,
     balance.constraint = week.balance.constraint(df, n.week, balance.factor = balance.factor)
     saturday.constraint = no.saturday.constraint(df, n.week)
     cost.vector = cost.vector.rest.days(rest.preferences,
-                                          df,
-                                          penalty.vector,
-                                          n.week)
+                                        df,
+                                        penalty.vector,
+                                        n.week)
     if(!is.null(dim(pre.planned)))
     {
       cost.vector.change = cost.vector.changes(pre.planned, pre.planned.length, n.week = n.week, first.week = first.week, c1, c2)
@@ -393,12 +418,11 @@ generate.planning <- function(history.vector = 1:29,
                            num.bin.solns = num.bin.solns)
 
     if(return.full.sol) return(sol)
-    if(sol.number != 0) return(format.planning(sol, df, sol.number))
+    if(sol.number == 0) return(format.planning(sol, df, sol.number))
     else
     {
       best.sol.indice = most.weekly.spread.conflicts(sol, df, rest.preferences)
       sol.planning = format.planning(sol, df, best.sol.indice)
-      browser()
       return(sol.planning)
     }
 }
@@ -409,14 +433,14 @@ recursive.generation <- function(holiday.data = NA,
                                  last.week = 52,
                                  number.of.rounds = 51,
                                  num.bin.sol = 1,
-                                 pre.planned.length = 7 * 6)
+                                 pre.planned.length = 7 * 7)
 {
   planning = generate.planning(n.week = last.week,
                                first.week = first.week,
                                sol.number = 1)
   result.stack = planning
   penalty.vector.stack = rep(0, dim(planning)[1])
-  NA.week = data.frame(matrix(rep(NA, dim(planning)[1] * 6), nrow = dim(planning)[1]))
+  NA.week = data.frame(matrix(rep(NA, dim(planning)[1] * 7), nrow = dim(planning)[1]))
   colnames(NA.week) = c("lu", "ma", "me", "je", "ve", "sa")
   rownames(NA.week) = rownames(planning)
   NA.weeks = NA.week
@@ -426,7 +450,7 @@ recursive.generation <- function(holiday.data = NA,
                                    n.week = last.week - week,
                                    first.week = week,
                                    sol.number = 1,
-                                   pre.planned.length = min(pre.planned.length, (last.week - week) * 6))
+                                   pre.planned.length = min(pre.planned.length, (last.week - week) * 7))
 
       # stocker l'etat des 7 semaines a venir a chaque round
       penalty.vector.stack = rbind(penalty.vector.stack, current.penalties(planning, rest.preferences, week))
@@ -442,9 +466,9 @@ recursive.generation <- function(holiday.data = NA,
 
 
 continue.planning <- function(planning,
-                              df = extract.data(file.location = "~/Desktop/planningRadio/data/dataPlanning.csv",
+                              df = extract.data(file.location = paste(folder, "data/dataPlanning.csv", sep = ''),
                                                 saturday.penalty = 2)$df,
-                              rest.preferences = extract.data(file.location = "~/Desktop/planningRadio/data/dataPlanning.csv",
+                              rest.preferences = extract.data(file.location = paste(folder, "data/dataPlanning.csv", sep = ''),
                                                               saturday.penalty = 2)$rest.preferences,
                               n.week = 8,
                               penalty.factor = 2, # penalty factor between first and last group
@@ -455,7 +479,7 @@ continue.planning <- function(planning,
                               holiday.data = NA,
                               balance.factor = 0.8)
 {
-  first.week = (dim(planning)[2] / 6) + 1
+  first.week = (dim(planning)[2] / 7) + 1
   history.vector = current.penalties(planning, rest.preferences)
   following.planning = generate.planning(history.vector = history.vector,
                                          n.week = n.week,

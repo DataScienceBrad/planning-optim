@@ -1,0 +1,13 @@
+!_TAG_FILE_FORMAT	2	/extended format; --format=1 will not append ;" to lines/
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted, 2=foldcase/
+!_TAG_PROGRAM_AUTHOR	Darren Hiebert	/dhiebert@users.sourceforge.net/
+!_TAG_PROGRAM_NAME	Exuberant Ctags	//
+!_TAG_PROGRAM_URL	http://ctags.sourceforge.net	/official site/
+!_TAG_PROGRAM_VERSION	5.9~svn20110310	//
+cost	optimTest.py	/^def cost(x):$/;"	f
+holiday_constraint_vector	optimTest.py	/^def holiday_constraint_vector(nbr_radiologues, nbr_semaines):$/;"	f
+holiday_penalty	optimTest.py	/^def holiday_penalty(x):$/;"	f
+initial_guess	optimTest.py	/^initial_guess = np.column_stack((np.ones((4, 8)), np.zeros((4, 12))))$/;"	v
+initialisePlanning	dataStruct.py	/^def initialisePlanning(year):$/;"	f
+vectorised_guess	optimTest.py	/^vectorised_guess = np.transpose(initial_guess).reshape(80, 1)$/;"	v
+work_amount_penaly	optimTest.py	/^def work_amount_penaly(x, nbr_radiologues = 4, work_amount_required = 8):$/;"	f

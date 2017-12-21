@@ -1,11 +1,8 @@
 source('optim.R')
 
-df = extract.data(file.location = "~/Desktop/planningRadio/data/dataPlanning.csv", saturday.penalty = 2)$df
+df = extract.data(file.location = "../data/dataPlanning.csv", saturday.penalty = 2)$df
 
-rest.preferences = extract.data(file.location = "~/Desktop/planningRadio/data/dataPlanning.csv",
-                                saturday.penalty = 2)$rest.preferences
-
-rest.preferences = extract.data(file.location = "~/Desktop/planningRadio/data/dataPlanning.csv",
+rest.preferences = extract.data(file.location = "../data/dataPlanning.csv",
                                 saturday.penalty = 2)$rest.preferences
 
 holiday.df = extract.holiday.data()
