@@ -210,6 +210,20 @@ holiday.constraint <- function(holiday.data, n.week)
               "const.value" = c(0)))
 }
 
+# BINARY CONSTRAINT
+
+force.binary.constraint <- function(df, n.week)
+{
+  n.radiologue = nrow(df)
+  calendar.length = n.week * 7
+  n.constraints = n.radiologue * calendar.length
+  const.matrix = diag(n.constraints)
+  rsplit <- as.list(as.data.frame(t(const.matrix)))
+  const.matrix = do.call(rbind,rsplit)
+  const.value = rep(1, n.constraints)
+  const.dir = rep("<=", n.constraints)
+  return(list("const.matrix" = const.matrix, "const.dir" = const.dir, "const.value" = const.value))
+}
 
 # Cost function:
 # Combinaison lineraire des couts individuels sur les contraintes flexibles,
@@ -249,7 +263,6 @@ cost.vector.week.balance <- function(df,
   weekly.load.matrix = matrix(nrow = 0, ncol = calendar.length * n.radiologue)
   for(i in 1:n.radiologue)
   {
-  
     individual.interpolation = rep(0, n.radiologue)
     individual.interpolation[i] = 1
     individual.interpolation = rep(individual.interpolation, calendar.length)
@@ -290,22 +303,33 @@ planning.solver <- function(cost.vector,
                             const.matrix,
                             const.dir,
                             const.val,
-                            num.bin.solns)
+                            int.vect,
+                            binary.vect,
+                            all.bin = TRUE)
 {
   sol = lp(objective.in = cost.vector,
            direction = "min",
            const.mat = const.matrix,
            const.dir = const.dir,
            const.rhs = const.val,
-           all.bin = TRUE,
+           all.bin = all.bin,
            compute.sens = 1,
-           num.bin.solns = num.bin.solns,
            use.rw = TRUE)
   return(sol)
 }
 
 
-format.planning <- function(sol, df, sol.number = 1)
+format.planning <- function(solution, df, calendar.length)
+{
+  radiologues = df[, 1]
+  weekdays = c("lu", "ma", "me", "je", "ve", "sa", "di")
+  sol.planning = matrix(solution, nrow = length(radiologues), byrow = FALSE)
+  rownames(sol.planning) <- radiologues
+  colnames(sol.planning) <- rep(weekdays, ncol(sol.planning) / 7)
+  return(sol.planning)
+}
+
+format.planning2 <- function(sol, df, sol.number = 1)
 {
   number.of.solution =  sol$num.bin.solns
   solution.length = (length(sol$solution)) / number.of.solution ## il y avait un -1 bizare qui a ete supprime
