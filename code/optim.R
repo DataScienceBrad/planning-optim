@@ -18,7 +18,7 @@ extract.data <- function(file.location = paste(folder, "data/dataPlanning.csv", 
   for(i in 1:nrow(df))
   {
     rest.vector = c(rep(0, 5), saturday.penalty, 0)
-    rest.days = paste(df[i, 5], df[i, 7], df[i, 7], sep = '.')
+    rest.days = paste(df[i, 5], df[i, 6], df[i, 7], sep = '.')
     rest.days = strsplit(rest.days, '\\.')
     if('lu' %in% rest.days[[1]]) rest.vector[1] = 1
     if('ma' %in% rest.days[[1]]) rest.vector[2] = 1
@@ -211,7 +211,6 @@ holiday.constraint <- function(holiday.data, n.week)
 }
 
 # BINARY CONSTRAINT
-
 force.binary.constraint <- function(df, n.week)
 {
   n.radiologue = nrow(df)
@@ -223,6 +222,29 @@ force.binary.constraint <- function(df, n.week)
   const.value = rep(1, n.constraints)
   const.dir = rep("<=", n.constraints)
   return(list("const.matrix" = const.matrix, "const.dir" = const.dir, "const.value" = const.value))
+}
+
+# MAX UNFULFILLED PREFERENCE CONSTRAINT
+max.unfulfilled.constraint <- function(rest.preferences,
+                                       df,
+                                       n.week,
+                                       max.unfulfilled = 5)
+{
+  n.radiologues = nrow(df)
+  calendar.length = n.week * 7
+  rest.preferences.cost.vector = rep(c(rest.preferences), n.week)
+  individual.preferences.matrix = matrix(nrow = 0, ncol = calendar.length * n.radiologues)
+  for(i in 1:n.radiologues)
+  {
+    individual.interpolation = rep(0, n.radiologues)
+    individual.interpolation[i] = 1
+    individual.interpolation = rep(individual.interpolation, calendar.length)
+    individual.rest.preferences = rest.preferences.cost.vector * individual.interpolation
+    individual.preferences.matrix = rbind(individual.preferences.matrix, individual.rest.preferences)
+  }
+  return(list("const.matrix" = individual.preferences.matrix,
+              "const.dir" = rep("<=", n.radiologues),
+              "const.value" = rep(max.unfulfilled, n.radiologues)))
 }
 
 # Cost function:
