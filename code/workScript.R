@@ -9,7 +9,8 @@ n.radiologues = 29
 dataPlanningFile = paste(folder, "data/dataPlanning.csv", sep = '')
 history.vector = 1:n.radiologues
 penalty.factor = 1
-workforce.factor = 0.6 # proportion de travail minimal total hebdomadaire / standard
+workforce.min.factor = 0.6 # proportion de travail minimal total hebdomadaire / standard
+workforce.max.factor = 1.15
 overwork.factor = 1 # proportion minimal totale par worker pour la workload constraint
 unbalanced.factor = 1 / 10
 num.bin.solns = 1
@@ -35,7 +36,8 @@ penalty.vector = rep(1, length(penalty.vector))
 # one single line
 holiday = holiday.constraint(holiday.data)
 # one line per week
-workforce = workforce.constraint(df, n.week, workforce.factor = workforce.factor)
+workforce.min = workforce.min.constraint(df, n.week, workforce.factor = workforce.min.factor)
+workforce.max = workforce.max.constraint(df, n.week, workforce.factor = workforce.max.factor)
 # one line per radio
 workload = workload.constraint(df, n.week = n.week, overwork.factor = overwork.factor)
 saturday = saturday.constraint(df, n.week)
@@ -53,7 +55,8 @@ const.matrix = rbind(workload$const.matrix,
                      holiday$const.matrix,
                      binaries$const.matrix,
                      unfulfilled$const.matrix,
-                     workforce$const.matrix)#,
+                     workforce.min$const.matrix,
+                     workforce.max$const.matrix)#,
                      #saturday$const.matrix)
 
 dim(binaries$const.matrix)
@@ -62,14 +65,16 @@ const.dir = c(workload$const.dir,
               holiday$const.dir,
               binaries$const.dir,
               unfulfilled$const.dir,
-              workforce$const.dir)#,
+              workforce.min$const.dir,
+              workforce.max$const.dir)#,
               #saturday$const.dir)
 
 const.val = c(workload$const.value,
               holiday$const.value,
               binaries$const.val,
               unfulfilled$const.value,
-              workforce$const.value)#,
+              workforce.min$const.value,
+              workforce.max$const.value)#,
               #saturday$const.value)
 
 length(cost.vector)
@@ -191,6 +196,7 @@ end_time - start_time
 rowSums(planning) * 2
 rowSums(unfulfilled$const.matrix %*% solution)
 
+workforce.min$const.matrix %*% solution
 
 planning
 #rowSums(planning)

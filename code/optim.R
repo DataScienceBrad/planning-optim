@@ -131,7 +131,7 @@ workload.constraint2 <- function(df, n.week = 8, week.start, work.meter, holiday
 }
 
 # chaque semaine, le nombre total de vacation atribuées doit etre superieur a un seuil
-workforce.constraint <- function(df, n.week, workforce.factor)
+workforce.min.constraint <- function(df, n.week, workforce.factor)
 {
   n.radiologue = nrow(df)
   calendar.length = n.week * 7
@@ -146,6 +146,24 @@ workforce.constraint <- function(df, n.week, workforce.factor)
   effective.week.workforce = sum(as.numeric(gsub(",",".", df[,"ETP"]))) * 4
   const.value = rep(floor(effective.week.workforce * workforce.factor), n.week)
   const.dir = rep(">=", n.week)
+  return(list("const.matrix" = const.matrix, "const.dir" = const.dir, "const.value" = const.value))
+}
+
+workforce.max.constraint <- function(df, n.week, workforce.factor)
+{
+  n.radiologue = nrow(df)
+  calendar.length = n.week * 7
+
+  const.matrix = c()
+  for(i in 1:n.week)
+  {
+    ith.week.constraint = rep(0, n.radiologue * calendar.length)
+    ith.week.constraint[((i - 1) * 7 * n.radiologue + 1):(i * 7 * n.radiologue)] = rep(1, 7)
+    const.matrix = rbind(const.matrix, ith.week.constraint)
+  }
+  effective.week.workforce = sum(as.numeric(gsub(",",".", df[,"ETP"]))) * 4
+  const.value = rep(floor(effective.week.workforce * workforce.factor), n.week)
+  const.dir = rep("<=", n.week)
   return(list("const.matrix" = const.matrix, "const.dir" = const.dir, "const.value" = const.value))
 }
 
@@ -248,6 +266,21 @@ max.unfulfilled.constraint <- function(rest.preferences,
   return(list("const.matrix" = individual.preferences.matrix,
               "const.dir" = rep("<=", n.radiologues),
               "const.value" = rep(max.unfulfilled, n.radiologues)))
+}
+
+# HISTORY CONSTRAINT
+# history solution is formatted a planning solution
+# if the length of it is 29*14, it will be assumed
+# that these are the first two weeks of the year, to be set
+force.history.constraint <- function(history.solution)
+{
+  n.constraints = length(history.solution)
+  const.matrix = diag(n.constraints)
+  rsplit <- as.list(as.data.frame(t(const.matrix)))
+  const.matrix = do.call(rbind,rsplit)
+  const.value = c(history.solution)
+  const.dir = rep("==", n.constraints)
+  return(list("const.matrix" = const.matrix, "const.dir" = const.dir, "const.value" = const.value))
 }
 
 # Cost function:
