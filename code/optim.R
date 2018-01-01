@@ -2,6 +2,9 @@ library('lpSolve')
 library('data.table')
 source('planningFeedback.R')
 # parameters
+
+
+
 folder = "~/Workspace/planning-optim/"
 # La variable d'optimisation du problème est organisé par jour:
 # Les 29 premiers indices correspondent à la présence de chaque radiologue

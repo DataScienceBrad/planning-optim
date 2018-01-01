@@ -8,20 +8,20 @@ library('data.table')
 n.radiologues = 29
 dataPlanningFile = paste(folder, "data/dataPlanning.csv", sep = '')
 history.vector = 1:n.radiologues
-penalty.factor = 2
+penalty.factor = 1
 workforce.factor = 0.6 # proportion de travail minimal total hebdomadaire / standard
-overwork.factor = 0.4 # proportion minimal totale par worker pour la workload constraint
+overwork.factor = 1 # proportion minimal totale par worker pour la workload constraint
 unbalanced.factor = 1 / 10
 num.bin.solns = 1
-max.unfulfilled = 10
+max.unfulfilled = 20
 # generation variable
 
 start.week = 1
-end.week = 51
+end.week = 52
 n.week = end.week - start.week + 1
 holiday.data = extract.holiday.data()
 holiday.data = troncate.holiday.data(holiday.data, start.week, end.week)
-radiologues.data = extract.data(file.location = dataPlanningFile, saturday.penalty = 2)
+radiologues.data = extract.data(file.location = dataPlanningFile, saturday.penalty = 0)
 df = radiologues.data$df
 rest.preferences = radiologues.data$rest.preferences
 
@@ -52,7 +52,7 @@ cost.vector = cost.vector.rest.days(rest.preferences, df, penalty.vector, n.week
 const.matrix = rbind(workload$const.matrix,
                      holiday$const.matrix,
                      binaries$const.matrix,
-#                     unfulfilled$const.matrix)#,
+                     unfulfilled$const.matrix,
                      workforce$const.matrix)#,
                      #saturday$const.matrix)
 
@@ -61,14 +61,14 @@ dim(binaries$const.matrix)
 const.dir = c(workload$const.dir,
               holiday$const.dir,
               binaries$const.dir,
-          #    unfulfilled$const.dir)#,
+              unfulfilled$const.dir,
               workforce$const.dir)#,
               #saturday$const.dir)
 
 const.val = c(workload$const.value,
               holiday$const.value,
               binaries$const.val,
-          #    unfulfilled$const.dir)#,
+              unfulfilled$const.value,
               workforce$const.value)#,
               #saturday$const.value)
 
@@ -163,6 +163,11 @@ length(const.dir)
 dim(const.matrix)
 dim(balance.matrix)
 
+13275 - 2608
+
+(balance.matrix %*% sol$solution - const.val[10668:13275])[59:112]
+
+
 start_time <- Sys.time()
 
 # Time difference of 1.000327 mins
@@ -175,52 +180,20 @@ sol = lp(objective.in = cost.vector,
 #         compute.sens = 1,
          use.rw = TRUE)
 
+
 solution = sol$solution
 solution = solution[1:(calendar.length*n.radiologues)]
-
 middle_time <- Sys.time()
-
-rowSums(unfulfilled$const.matrix * solution)
-
-
-unfulfilled$const.matrix[1,1:29]
-
-
 planning = format.planning(solution, df, calendar.length)
-
 end_time <- Sys.time()
-
 end_time - start_time
+
+rowSums(planning) * 2
+rowSums(unfulfilled$const.matrix %*% solution)
+
 
 planning
 #rowSums(planning)
 
 write.table(planning, 'suggested-planning.csv', sep = ';')
 # ajouter le dimanche dans le vecteur, vacances pour tout le monde
-
-
-
-
-
-
-max.unfulfilled.constraint <- function(rest.preferences,
-                                       df,
-                                       n.week,
-                                       max.unfulfilled = 5)
-{
-  n.radiologues = nrow(df)
-  calendar.length = n.week * 7
-  rest.preferences.cost.vector = rep(c(rest.preferences), n.week)
-  individual.preferences.matrix = matrix(nrow = 0, ncol = calendar.length * n.radiologues)
-  for(i in 1:n.radiologues)
-  {
-    individual.interpolation = rep(0, n.radiologues)
-    individual.interpolation[i] = 1
-    individual.interpolation = rep(individual.interpolation, calendar.length)
-    individual.rest.preferences = rest.preferences.cost.vector * individual.interpolation
-    individual.preferences.matrix = rbind(individual.preferences.matrix, individual.rest.preferences)
-  }
-  return(list("const.matrix" = individual.preferences.matrix,
-              "const.dir" = rep("<=", n.radiologues),
-              "const.value" = rep(max.unfulfilled, n.radiologues)))
-}
