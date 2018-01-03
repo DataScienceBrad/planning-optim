@@ -54,6 +54,8 @@ extract.holiday.data <- function(file.location = "../data/conges-calendrier.csv"
 }
 
 
+
+
 # depreciated, since we now have a different format for the csv file
 extract.holiday.data2 <- function(file.location = "../data/holidays.csv")
 {
@@ -130,8 +132,72 @@ workload.constraint2 <- function(df, n.week = 8, week.start, work.meter, holiday
   return(list("const.matrix" = const.matrix , "const.dir" = const.dir, "const.value" = const.value))
 }
 
+
 # chaque semaine, le nombre total de vacation atribuées doit etre superieur a un seuil
-workforce.min.constraint <- function(df, n.week, workforce.factor)
+# sur cette version, ce seuil depend du nombre de radiologues disponibles (donc du nbr de radiologues en vacances)
+workforce.min.constraint <- function(df, start.week, end.week)
+{
+  n.radiologue = nrow(df)
+  calendar.length = n.week * 7
+  const.matrix = c()
+  weekly.min = get.weekly.minimums(start.week, end.week)
+  for(i in 1:n.week)
+  {
+    ith.week.constraint = rep(0, n.radiologue * calendar.length)
+    ith.week.constraint[((i - 1) * 7 * n.radiologue + 1):(i * 7 * n.radiologue)] = rep(1, 7)
+    const.matrix = rbind(const.matrix, ith.week.constraint)
+  }
+  effective.week.workforce = sum(as.numeric(gsub(",",".", df[,"ETP"]))) * 4
+  const.value = get.weekly.minimums(start.week, end.week)
+  const.dir = rep(">=", n.week)
+  return(list("const.matrix" = const.matrix, "const.dir" = const.dir, "const.value" = const.value))
+}
+
+get.weekly.minimums <- function(start.week,
+                                end.week,
+                                n.radiologues = 29,
+                                full.force.threshold = 80,
+                                workforce.min.factor = 0.8,
+                                max.minimum = 95)
+{
+  # number of available vacations
+  weekly.ressources = n.radiologues * 7 - compute.weekly.days.off(start.week = start.week, end.week = end.week)
+  minimums = c()
+  for (i in 1:length(weekly.ressources))
+  {
+    max = weekly.ressources[i]
+    if (max <= full.force.threshold)
+    {
+      minimums[i] = max
+    }
+    else
+    {
+      minimums[i] = workforce.min.factor * max
+    }
+    if (minimums[i] > max.minimum)
+    {
+      minimums[i] = max.minimum
+    }
+  }
+  return(minimums)
+}
+
+# compute the amount of people on holiday every week to output the maximum presence potential
+compute.weekly.days.off <- function(start.week, end.week)
+{
+  holidays <- extract.holiday.data()
+  days.off = c()
+  for (week in start.week:end.week)
+  {
+    days.off = c(days.off, sum(holidays[, (7 * (week - 1) + 1):(7 * week)]))
+  }
+  return(days.off)
+}
+
+
+
+# chaque semaine, le nombre total de vacation atribuées doit etre superieur a un seuil
+workforce.min.constraint2 <- function(df, n.week, workforce.factor)
 {
   n.radiologue = nrow(df)
   calendar.length = n.week * 7
