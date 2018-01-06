@@ -164,13 +164,13 @@ workforce.min.constraint <- function(df, start.week, end.week, full.force.thresh
     const.matrix = rbind(const.matrix, ith.week.constraint)
   }
   effective.week.workforce = sum(as.numeric(gsub(",",".", df[,"ETP"]))) * 4
-  const.value = get.weekly.min['minimums']
+  const.value = get.weekly.min$minimums
   const.dir = rep(">=", n.week)
   return(list("const.matrix" = const.matrix,
               "const.dir" = const.dir,
               "const.value" = const.value,
-              'minimums' = get.weekly.min['minimums'],
-              'limits' = get.weekly.min['limits']))
+              'minimums' = get.weekly.min$minimums,
+              'limits' = get.weekly.min$limits))
 }
 
 get.weekly.minimums <- function(start.week,

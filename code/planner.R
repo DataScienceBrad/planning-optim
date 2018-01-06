@@ -3,15 +3,21 @@ source('/home/cramdoulfa/Workspace/planning-optim/code/planningFeedback.R')
 library('lpSolve')
 library('data.table')
 
+start.week = 1
+end.week = 10
+workload.min.factor = 0.6
 
-planner <- function(start.week,
-                    end.week,
-                    workload.min.factor)#,
+define.problem <- function(start.week,
+                           end.week,
+                           workload.min.factor)#,
         #            workload.max.factor)
 {
-    # global vars
-    n.radiologues = 29
     dataPlanningFile = paste(folder, "data/dataPlanning.csv", sep = '')
+    holiday.data = troncate.holiday.data(extract.holiday.data(), start.week, end.week)
+    radiologues.data = extract.data(file.location = dataPlanningFile, saturday.penalty = 0)
+    df = radiologues.data$df
+    # global vars
+    n.radiologues = nrow(df)
     history.vector = 1:n.radiologues
     penalty.factor = 1
     workforce.min.factor = 0.6 # proportion de travail minimal total hebdomadaire / standard
@@ -19,15 +25,9 @@ planner <- function(start.week,
     unbalanced.factor = 1 / 10
     num.bin.solns = 1
     max.unfulfilled = 20
-
-    # generation variable
-#    start.week = 1
-#    end.week = 10
     n.week = end.week - start.week + 1
     calendar.length = n.week * 7
-    holiday.data = troncate.holiday.data(extract.holiday.data(), start.week, end.week)
-    radiologues.data = extract.data(file.location = dataPlanningFile, saturday.penalty = 0)
-    df = radiologues.data$df
+
     rest.preferences = radiologues.data$rest.preferences
     rownames(holiday.data) = rownames(rest.preferences)
 
@@ -36,7 +36,8 @@ planner <- function(start.week,
     # one single line
     holiday = holiday.constraint(holiday.data)
     # one line per week
-    workforce.min = workforce.min.constraint(df, start.week, end.week, full.force.threshold = 75, workforce.min.factor = 0.6, max.minimum = 90)    workforce.max = workforce.max.constraint(df, n.week, workforce.factor = workforce.max.factor)
+    workforce.min = workforce.min.constraint(df, start.week, end.week, full.force.threshold = 75, workforce.min.factor = 0.6, max.minimum = 90)
+    workforce.max = workforce.max.constraint(df, n.week, workforce.factor = workforce.max.factor)
 
     # one line per radiologue
 #    workload = workload.constraint(df, n.week = n.week, workload.min.factor, workload.max.factor)
@@ -139,20 +140,33 @@ planner <- function(start.week,
     # computation time landmark
     middle_time <- Sys.time()
 
-    sol = lp(objective.in = cost.vector,
-             direction = "min",
-             const.mat = const.matrix,
-             const.dir = const.dir,
-             const.rhs = const.val,
-             all.int = TRUE,
-    #         compute.sens = 1,
-             use.rw = TRUE)
-
-    middle_time2 <- Sys.time()
-
-    # format the solution
-    solution = sol$solution
-    solution = solution[1:(calendar.length*n.radiologues)]
-    planning = format.planning(solution, df, calendar.length)
-    return(planning, workforce.min.values = workforce.min['minimums'], workforce.min.limits = workforce.min['limits'])
+    return(list('cost.vector' = cost.vector,
+           'const.mat' = const.matrix,
+           'const.dir' = const.dir,
+           'const.val' = const.val,
+           'workforce.min.values' = workforce.min$minimums,
+           'workforce.min.limits' = workforce.min$limits,
+           'df' = df,
+           'calendar.length' = calendar.length))
 }
+
+
+
+
+#    sol = lp(objective.in = cost.vector,
+#             direction = "min",
+#             const.mat = const.matrix,
+#             const.dir = const.dir,
+#             const.rhs = const.val,
+#             all.int = TRUE,
+#    #         compute.sens = 1,
+#             use.rw = TRUE)
+#
+#    middle_time2 <- Sys.time()
+#
+#    # format the solution
+#    solution = sol$solution
+#    solution = solution[1:(calendar.length*n.radiologues)]
+#    planning = format.planning(solution, df, calendar.length)
+#    return(planning, workforce.min.values = workforce.min['minimums'], workforce.min.limits = workforce.min['limits'])
+#}

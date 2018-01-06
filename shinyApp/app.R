@@ -37,12 +37,7 @@ ui <- fluidPage(
   # Button
   downloadButton("downloadData", "Download Planning"),
 
-  fileInput("file1", "Choose CSV File",
-            multiple = TRUE,
-            accept = c("text/csv",
-                     "text/comma-separated-values,text/plain",
-                     ".csv")),
-
+  actionButton("go", "Go"),
 
   # App title ----
   titlePanel("Sliders"),
@@ -70,10 +65,7 @@ ui <- fluidPage(
                   max = 1.3, step = 0.01,
                   value = c(0.97, 1.03)),
 
-      sliderInput(names[1], displayNames[1],
-                  min = fourchette[1, 1],
-                  max = fourchette[1, 2],
-                  value = c(valueFourchette[1], valueFourchette[1] + deltaFourchette)),
+      uiOutput("testSelector"),
 
       sliderInput(names[2], displayNames[2],
                   min = fourchette[2, 1],
@@ -165,27 +157,40 @@ ui <- fluidPage(
 server <- function(input, output) {
 
   output$workloadValue  <- renderText({
-  paste("peter delay is ", as.character(plannerList()[2]))
+  paste("Computation time:", as.character(planning.solver()$computation.time))
 })
 
 
   # Compute planning
-  plannerList <- reactive({
+  variables <- reactive({
+     define.problem(input$start.week,
+                    input$end.week,
+                    input$workload[1])#,
+    })
 
+  planning.solver <- eventReactive(input$go, {
     start_time <- Sys.time()
 
-    planning <- planner(input$start.week,
-                        input$end.week,
-                        input$workload[1])#,
-                      #  input$workload[2])
-
-    computationTime <- Sys.time() - start_time
-    return(list(planning, computationTime))
+    sol = lp(objective.in = variables()$cost.vector,
+             const.mat = variables()$const.mat,
+             const.dir = variables()$const.dir,
+             const.rhs = variables()$const.val,
+             direction = "min",
+             all.int = TRUE,
+             use.rw = TRUE)
+    computation.time <- Sys.time() - start_time
+    # format the solution
+    n.radiologues = nrow(variables()$df)
+    solution = sol$solution
+    solution = solution[1:(variables()$calendar.length * n.radiologues)]
+    planning = format.planning(solution, variables()$df, variables()$calendar.length)
+    list('planning' = planning, 'computation.time' = computation.time)
   })
+
 
   # DF output
   output$plannerTable <- renderTable({
-    plannerList()[1]
+    planning.solver()$planning
   })
 
 
@@ -193,11 +198,16 @@ server <- function(input, output) {
   output$downloadData <- downloadHandler(
     filename = 'suggested-planning.csv',
     content = function(file) {
-      write.table(plannerList(), file, sep = ';')
-    }
-  )
+      write.table(planning.solver(), file, sep = ';')
+    })
 
+  output$testSelector <- renderUI({
 
+    sliderInput(names[1], displayNames[1],
+                min = fourchette[1, 1],
+                max = variables()$workforce.min.limits[1],
+                value = c(valueFourchette[1], valueFourchette[1] + deltaFourchette))
+    })
 }
 
 # Create Shiny app ----
