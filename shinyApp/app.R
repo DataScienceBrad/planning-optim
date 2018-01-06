@@ -1,5 +1,8 @@
 library(shiny)
 
+source('/home/cramdoulfa/Workspace/planning-optim/code/optim.R')
+source('/home/cramdoulfa/Workspace/planning-optim/code/planner.R')
+
 names = c(
 'week1',
 'week2',
@@ -25,12 +28,21 @@ displayNames = c(
 'Week 10')
 
 fourchette = t(matrix(rep(c(60, 120), 10), ncol = 10))
-valueFourchette = rep(100, 10)
-
-
+valueFourchette = rep(90, 10)
+deltaFourchette = 20
 
 # Define UI for slider demo app ----
 ui <- fluidPage(
+
+  # Button
+  downloadButton("downloadData", "Download Planning"),
+
+  fileInput("file1", "Choose CSV File",
+            multiple = TRUE,
+            accept = c("text/csv",
+                     "text/comma-separated-values,text/plain",
+                     ".csv")),
+
 
   # App title ----
   titlePanel("Sliders"),
@@ -41,67 +53,72 @@ ui <- fluidPage(
     # Sidebar to demonstrate various slider options ----
     sidebarPanel(
 
+      verbatimTextOutput("workloadValue"),
+
+      # Input: Simple integer interval ----
+      sliderInput("start.week", "Start week:",
+                  min = 1, max = 52,
+                  value = 1),
+
+      # Input: Decimal interval with step value ----
+      sliderInput("end.week", "End week:",
+                  min = 1, max = 52,
+                  value = 10),
+
+      sliderInput('workload', 'Individual workload margin:',
+                  min = 0.5,
+                  max = 1.3, step = 0.01,
+                  value = c(0.97, 1.03)),
+
       sliderInput(names[1], displayNames[1],
                   min = fourchette[1, 1],
                   max = fourchette[1, 2],
-                  value = valueFourchette[1]),
+                  value = c(valueFourchette[1], valueFourchette[1] + deltaFourchette)),
 
       sliderInput(names[2], displayNames[2],
                   min = fourchette[2, 1],
                   max = fourchette[2, 2],
-                  value = valueFourchette[2]),
+                  value = c(valueFourchette[2], valueFourchette[2] + deltaFourchette)),
 
       sliderInput(names[3], displayNames[3],
                   min = fourchette[3, 1],
                   max = fourchette[3, 2],
-                  value = valueFourchette[3]),
+                  value = c(valueFourchette[3], valueFourchette[3] + deltaFourchette)),
 
       sliderInput(names[4], displayNames[4],
                   min = fourchette[4, 1],
                   max = fourchette[4, 2],
-                  value = valueFourchette[4]),
+                  value = c(valueFourchette[4], valueFourchette[4] + deltaFourchette)),
 
       sliderInput(names[5], displayNames[5],
                   min = fourchette[5, 1],
                   max = fourchette[5, 2],
-                  value = valueFourchette[5]),
+                  value = c(valueFourchette[5], valueFourchette[5] + deltaFourchette)),
 
       sliderInput(names[6], displayNames[6],
                   min = fourchette[6, 1],
                   max = fourchette[6, 2],
-                  value = valueFourchette[6]),
+                  value = c(valueFourchette[6], valueFourchette[6] + deltaFourchette)),
 
       sliderInput(names[7], displayNames[7],
                   min = fourchette[7, 1],
                   max = fourchette[7, 2],
-                  value = valueFourchette[7]),
+                  value = c(valueFourchette[7], valueFourchette[7] + deltaFourchette)),
 
       sliderInput(names[8], displayNames[8],
                   min = fourchette[8, 1],
                   max = fourchette[8, 2],
-                  value = valueFourchette[8]),
+                  value = c(valueFourchette[8], valueFourchette[8] + deltaFourchette)),
 
       sliderInput(names[9], displayNames[9],
                   min = fourchette[9, 1],
                   max = fourchette[9, 2],
-                  value = valueFourchette[9]),
+                  value = c(valueFourchette[9], valueFourchette[9] + deltaFourchette)),
 
       sliderInput(names[10], displayNames[10],
                   min = fourchette[10, 1],
                   max = fourchette[10, 2],
-                  value = valueFourchette[10]),
-
-
-
-      # Input: Simple integer interval ----
-      sliderInput("integer", "Integer:",
-                  min = 0, max = 1000,
-                  value = 500),
-
-      # Input: Decimal interval with step value ----
-      sliderInput("decimal", "Decimal:",
-                  min = 0, max = 1,
-                  value = 0.5, step = 0.1),
+                  value = c(valueFourchette[10], valueFourchette[10] + deltaFourchette)),
 
       # Input: Specification of range within an interval ----
       sliderInput("range", "Range:",
@@ -129,7 +146,15 @@ ui <- fluidPage(
     mainPanel(
 
       # Output: Table summarizing the values entered ----
-      tableOutput("values")
+      tableOutput("plannerTable")
+
+#      # workload
+#      rowSums(planning) * 2
+#      # constrariete
+#      rowSums(unfulfilled$const.matrix %*% solution)
+#      # workforce
+#      workforce.min$const.matrix %*% solution
+#
 
     )
   )
@@ -139,33 +164,39 @@ ui <- fluidPage(
 # Define server logic for slider examples ----
 server <- function(input, output) {
 
-  # Reactive expression to create data frame of all input values ----
-  sliderValues <- reactive({
+  output$workloadValue  <- renderText({
+  paste("peter delay is ", as.character(plannerList()[2]))
+})
 
 
+  # Compute planning
+  plannerList <- reactive({
 
+    start_time <- Sys.time()
 
+    planning <- planner(input$start.week,
+                        input$end.week,
+                        input$workload[1])#,
+                      #  input$workload[2])
 
-
-    data.frame(
-      Name = c("Integer",
-               "Decimal",
-               "Range",
-               "Custom Format",
-               "Animation"),
-      Value = as.character(c(input$integer,
-                             input$decimal,
-                             paste(input$range, collapse = " "),
-                             input$format,
-                             input$animation)),
-      stringsAsFactors = FALSE)
-
+    computationTime <- Sys.time() - start_time
+    return(list(planning, computationTime))
   })
 
-  # Show the values in an HTML table ----
-  output$values <- renderTable({
-    sliderValues()
+  # DF output
+  output$plannerTable <- renderTable({
+    plannerList()[1]
   })
+
+
+  # Download planning under CSV format
+  output$downloadData <- downloadHandler(
+    filename = 'suggested-planning.csv',
+    content = function(file) {
+      write.table(plannerList(), file, sep = ';')
+    }
+  )
+
 
 }
 

@@ -3,3 +3,6 @@
 - Les deux peters qui travaillent le meme jour
 - formation: entrer comme un jour de vacances, mais on doit pouvoir diminuer le nombre de vacations à réaliser
 - faire des modifs sur le planning
+
+
+samedis

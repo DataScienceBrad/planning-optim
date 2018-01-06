@@ -1,8 +1,7 @@
 library('lpSolve')
 library('data.table')
-source('planningFeedback.R')
+source('/home/cramdoulfa/Workspace/planning-optim/code/planningFeedback.R')
 # parameters
-
 
 
 folder = "~/Workspace/planning-optim/"
@@ -53,9 +52,6 @@ extract.holiday.data <- function(file.location = "../data/conges-calendrier.csv"
   return(df)
 }
 
-
-
-
 # depreciated, since we now have a different format for the csv file
 extract.holiday.data2 <- function(file.location = "../data/holidays.csv")
 {
@@ -90,7 +86,25 @@ troncate.holiday.data <- function(holiday.df, start.week, end.week)
 # fullTimeNbrWorkDay = floor((250 - 25)*4/5) = 180
 # Il semble qu'un radiologue fasse deux vacation par jour de travail
 # On estime le nbr de jour de travail par radiologue et par an en divisant son nbr de vacation par 2
-workload.constraint <- function(df, n.week = 8, overwork.factor = 1)
+workload.constraint2 <- function(df, n.week = 8, workload.min.factor = 0.98, workload.max.factor = 1.02)
+{
+  n.radiologue = nrow(df)
+  calendar.length = n.week * 7
+  const.dir = rep(">=", n.radiologue)
+  const.dir = c(const.dir, rep("<=", n.radiologue))
+  # valeur des containtes (terme de droite)
+  # egal au nombre de jour de boulot a realiser dans le calendrier pour chaque radiologue
+  # La division par deux vient du fait qu'on considère 2 vac / jour de boulot
+  workload.standard.vector = as.numeric(df[, 3])
+  min.value = floor(workload.min.factor * workload.standard.vector * n.week / (2 * 52))
+  max.value = floor(workload.max.factor * workload.standard.vector * n.week / (2 * 52)) + 1
+  const.value = c(min.value, max.value)
+  const.matrix = matrix(rep(diag(1, n.radiologue), calendar.length), n.radiologue, calendar.length * n.radiologue)
+  const.matrix = rbind(const.matrix, const.matrix)
+  return(list("const.matrix" = const.matrix , "const.dir" = const.dir, "const.value" = const.value))
+}
+
+workload.constraint <- function(df, n.week = 8, workload.min.factor = 1)
 {
   n.radiologue = nrow(df)
   calendar.length = n.week * 7
@@ -98,7 +112,7 @@ workload.constraint <- function(df, n.week = 8, overwork.factor = 1)
   # valeur des containtes (terme de droite)
   # egal au nombre de jour de boulot a realiser dans le calendrier pour chaque radiologue
   # La division par deux vient du fait qu'on considère 2 vac / jour de boulot
-  const.value = floor(overwork.factor * as.numeric(df[, 3]) * n.week / (2 * 52)) + 1
+  const.value = floor(workload.min.factor * as.numeric(df[, 3]) * n.week / (2 * 52)) + 1
   const.matrix = matrix(rep(diag(1, n.radiologue), calendar.length), n.radiologue, calendar.length * n.radiologue)
   return(list("const.matrix" = const.matrix , "const.dir" = const.dir, "const.value" = const.value))
 }
@@ -135,30 +149,36 @@ workload.constraint2 <- function(df, n.week = 8, week.start, work.meter, holiday
 
 # chaque semaine, le nombre total de vacation atribuées doit etre superieur a un seuil
 # sur cette version, ce seuil depend du nombre de radiologues disponibles (donc du nbr de radiologues en vacances)
-workforce.min.constraint <- function(df, start.week, end.week)
+workforce.min.constraint <- function(df, start.week, end.week, full.force.threshold = 75, workforce.min.factor = 0.6, max.minimum = 90)
 {
-  n.radiologue = nrow(df)
+  n.radiologues = nrow(df)
+  n.week = end.week - start.week + 1
   calendar.length = n.week * 7
   const.matrix = c()
-  weekly.min = get.weekly.minimums(start.week, end.week)
+  get.weekly.min = get.weekly.minimums(start.week, end.week, n.radiologues, full.force.threshold, workforce.min.factor, max.minimum)[]
+  weekly.min = get.weekly.min['minimums']
   for(i in 1:n.week)
   {
-    ith.week.constraint = rep(0, n.radiologue * calendar.length)
-    ith.week.constraint[((i - 1) * 7 * n.radiologue + 1):(i * 7 * n.radiologue)] = rep(1, 7)
+    ith.week.constraint = rep(0, n.radiologues * calendar.length)
+    ith.week.constraint[((i - 1) * 7 * n.radiologues + 1):(i * 7 * n.radiologues)] = rep(1, 7)
     const.matrix = rbind(const.matrix, ith.week.constraint)
   }
   effective.week.workforce = sum(as.numeric(gsub(",",".", df[,"ETP"]))) * 4
-  const.value = get.weekly.minimums(start.week, end.week)
+  const.value = get.weekly.min['minimums']
   const.dir = rep(">=", n.week)
-  return(list("const.matrix" = const.matrix, "const.dir" = const.dir, "const.value" = const.value))
+  return(list("const.matrix" = const.matrix,
+              "const.dir" = const.dir,
+              "const.value" = const.value,
+              'minimums' = get.weekly.min['minimums'],
+              'limits' = get.weekly.min['limits']))
 }
 
 get.weekly.minimums <- function(start.week,
                                 end.week,
-                                n.radiologues = 29,
-                                full.force.threshold = 80,
-                                workforce.min.factor = 0.8,
-                                max.minimum = 95)
+                                n.radiologues,
+                                full.force.threshold,
+                                workforce.min.factor,
+                                max.minimum)
 {
   # number of available vacations
   weekly.ressources = n.radiologues * 7 - compute.weekly.days.off(start.week = start.week, end.week = end.week)
@@ -179,7 +199,7 @@ get.weekly.minimums <- function(start.week,
       minimums[i] = max.minimum
     }
   }
-  return(minimums)
+  return(list("minimums" = floor(minimums), "limits" = weekly.ressources))
 }
 
 # compute the amount of people on holiday every week to output the maximum presence potential

@@ -1,4 +1,4 @@
-source('optim.R')
+source('/home/cramdoulfa/Workspace/planning-optim/code/optim.R')
 
 df = extract.data(file.location = "../data/dataPlanning.csv", saturday.penalty = 2)$df
 

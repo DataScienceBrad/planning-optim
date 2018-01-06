@@ -1,5 +1,5 @@
-source('optim.R')
-source('planningFeedback.R')
+source('/home/cramdoulfa/Workspace/planning-optim/code/optim.R')
+source('/home/cramdoulfa/Workspace/planning-optim/code/planningFeedback.R')
 
 library('lpSolve')
 library('data.table')
@@ -14,14 +14,18 @@ history.vector = 1:n.radiologues
 penalty.factor = 1
 workforce.min.factor = 0.6 # proportion de travail minimal total hebdomadaire / standard
 workforce.max.factor = 1
-overwork.factor = 1 # proportion minimal totale par worker pour la workload constraint
+workload.min.factor = 1
+workload.max.factor = 1.05
 unbalanced.factor = 1 / 10
 num.bin.solns = 1
-max.unfulfilled = 20
+max.unfulfilled = 52
+full.force.threshold = 75
+workforce.min.factor = 0.6
+max.minimum = 90
 
 # generation variable
 start.week = 1
-end.week = 52
+end.week = 22
 n.week = end.week - start.week + 1
 calendar.length = n.week * 7
 holiday.data = troncate.holiday.data(extract.holiday.data(), start.week, end.week)
@@ -35,10 +39,11 @@ rownames(holiday.data) = rownames(rest.preferences)
 # one single line
 holiday = holiday.constraint(holiday.data)
 # one line per week
-workforce.min = workforce.min.constraint(df, 1, 52)
+workforce.min = workforce.min.constraint(df, start.week, end.week, full.force.threshold = 75, workforce.min.factor = 0.6, max.minimum = 90)
 workforce.max = workforce.max.constraint(df, n.week, workforce.factor = workforce.max.factor)
 # one line per radiologue
-workload = workload.constraint(df, n.week = n.week, overwork.factor = overwork.factor)
+workload = workload.constraint(df, n.week = n.week, workload.min.factor = workload.min.factor)
+#workload = workload.constraint(df, n.week = n.week, workload.min.factor = workload.min.factor, workload.max.factor = workload.max.factor)
 saturday = saturday.constraint(df, n.week)
 binaries = force.binary.constraint(df, n.week)
 unfulfilled = max.unfulfilled.constraint(rest.preferences, df, n.week, max.unfulfilled = max.unfulfilled)
@@ -136,6 +141,8 @@ if (balancing)
 # computation time landmark
 middle_time <- Sys.time()
 
+const.val[1:29] = const.val[1:29] - 1
+
 sol = lp(objective.in = cost.vector,
          direction = "min",
          const.mat = const.matrix,
@@ -152,6 +159,8 @@ solution = sol$solution
 solution = solution[1:(calendar.length*n.radiologues)]
 planning = format.planning(solution, df, calendar.length)
 
+
+
 end_time <- Sys.time()
 end_time - start_time
 middle_time2 - middle_time
@@ -165,11 +174,19 @@ workforce.min$const.matrix %*% solution
 # planning
 planning
 
-write.table(planning, 'suggested-planning.csv', sep = ';')
+#write.table(planning, 'suggested-planning.csv', sep = ';')
 
 
 
 
+# to do:
+# samedis
+# connect input to planner
+# workload per radiologue, connect with DF
+# feedback on computation temination
+
+# done
+# solution download
 
 
 #a = 29*7 - compute.weekly.days.off(1,52)
