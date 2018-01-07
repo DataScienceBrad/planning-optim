@@ -430,16 +430,16 @@ cost.vector.week.balance <- function(df,
 # ex: we wanna plan the next 8 week and we have the 7 first weeks pre-planned
 # The ratio c1 over c2 allows to control for the importance of false negative as compared to false positive
 cost.vector.changes <- function(pre.planned.sol,
-                                pre.planned.length = dim(pre.planned.sol)[2] - 7, #take into account N-1 weeks
-                                n.week,
                                 first.week = 1,
+                                last.week = 7,
                                 c1 = 5,
                                 c2 = 2)
 {
-      pre.planned.vector = c(pre.planned.sol[, ((first.week - 1) * 7 + 1):(pre.planned.length + (first.week - 1) * 7)])
+      pre.planned.vector = c(pre.planned.sol[, ((first.week - 1) * 7 + 1):(last.week * 7)])
+      pre.planned.length = 7 * (last.week - first.week + 1)
       pre.planned.vector = Reduce(c, pre.planned.vector)
       cost.vector.changes = rep(c2, pre.planned.length * dim(pre.planned.sol)[1]) - (c1 + c2) * pre.planned.vector
-      cost.vector.changes = c(cost.vector.changes, rep(0, n.week * 7 * dim(pre.planned.sol)[1] - length(pre.planned.vector)))
+      cost.vector.changes = c(cost.vector.changes, rep(0, pre.planned.length * dim(pre.planned.sol)[1] - length(pre.planned.vector)))
       return(cost.vector.changes)
 }
 
@@ -588,6 +588,7 @@ generate.planning <- function(history.vector = 1:29,
       cost.vector.change = cost.vector.changes(pre.planned, pre.planned.length, n.week = n.week, first.week = first.week, c1, c2)
       cost.vector = cost.vector + cost.vector.change
     }
+
     const.matrix = rbind(workload.constraint$const.matrix,
                          holiday.constraint$const.matrix,
                          workforce.constraint$const.matrix,

@@ -9,7 +9,12 @@ workload.min.factor = 0.6
 
 define.problem <- function(start.week,
                            end.week,
-                           workload.min.factor)#,
+                           workload.min.factor,
+                           pre.planned = NA,
+                           pre.planned.start = NA,
+                           pre.planned.end = NA,
+                           c1 = 5,
+                           c2 = 2)#,
         #            workload.max.factor)
 {
     dataPlanningFile = paste(folder, "data/dataPlanning.csv", sep = '')
@@ -53,6 +58,12 @@ define.problem <- function(start.week,
     penalty.vector = rep(1, length(penalty.vector))
     # GENERATE COST VECTOR
     cost.vector = cost.vector.rest.days(rest.preferences, df, penalty.vector, n.week)
+
+    if(!is.null(dim(pre.planned)))
+    {
+      cost.vector.change = cost.vector.changes(pre.planned, first.week = pre.planned.start, last.week = pre.planned.end, c1 = c1, c2 = c2)
+      cost.vector = cost.vector + cost.vector.change
+    }
 
     # Append the constraints
     const.matrix = rbind(workforce.min$const.matrix,

@@ -184,6 +184,7 @@ planning
 # connect input to planner
 # workload per radiologue, connect with DF
 # feedback on computation temination
+# connect with real past schedule 
 
 # done
 # solution download

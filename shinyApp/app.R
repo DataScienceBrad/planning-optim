@@ -35,6 +35,13 @@ deltaFourchette = 20
 # Define UI for slider demo app ----
 ui <- fluidPage(
 
+  # Input: Select a file ----
+  fileInput("file1", "Choose CSV File",
+            multiple = FALSE,
+            accept = c("text/csv",
+                     "text/comma-separated-values,text/plain",
+                     ".csv")),
+
   # Button
   downloadButton("downloadData", "Download Planning"),
 
@@ -61,39 +68,38 @@ ui <- fluidPage(
                   min = 1, max = 52,
                   value = 10),
 
+      sliderInput('pre.planned.weeks', 'Pre-planned weeks:',
+                  min = 1,
+                  max = 52, step = 1,
+                  value = c(1, 7)),
+
+      sliderInput('pre.planned.weeks', 'Pre-planned weeks:',
+                  min = 1,
+                  max = 52, step = 1,
+                  value = c(1, 7)),
+
       sliderInput('workload', 'Individual workload margin:',
                   min = 0.5,
                   max = 1.3, step = 0.01,
                   value = c(0.97, 1.03)),
 
-      sliderInput("end.week", "End week:",
-                  min = 1, max = 52,
-                  value = 10),
+      sliderInput('c1', "Cout d'une annulation de vacation programmee",
+                  min = 1, max = 20, step = 0.5,
+                  value = 5),
 
-      sliderInput("end.week", "End week:",
-                  min = 1, max = 52,
-                  value = 10)
-
-#      uiOutput("weekSelector1"),
-#      uiOutput("weekSelector2"),
-
+      sliderInput('c2', "Cout d'une programmation tardive",
+                  min = 1, max = 20, step = 0.5,
+                  value = 2)
     ),
 
-    # Main panel for displaying outputs ----
     mainPanel(
+
+      tableOutput("pre.planned.table"),
 
       lapply(1:10, function(i) {
         uiOutput(paste0('weekUI', i))
       }),
 
-
-#      lapply(1:5, function(i) {
-#                                sliderInput(paste0('a', i),
-#                                            paste0('Week ', i),
-#                                            min = fourchette[i, 1],
-#                                            max = fourchette[i, 2],
-#                                            value = c(valueFourchette[i], valueFourchette[i] + deltaFourchette))
-#                              }),
 
 
       # Output: Table summarizing the values entered ----
@@ -119,13 +125,43 @@ server <- function(input, output) {
   paste("Computation time:", as.character(planning.solver()$computation.time))
 })
 
+# read input CSV file
+
+pre.planned <- reactive({
+  req(input$file1)
+  df <- read.csv(input$file1$datapath,
+                 header = TRUE,
+                 sep = ';')
+  return(df)
+})
+
+output$pre.planned.table <- renderTable({
+  req(pre.planned())
+  return(pre.planned())
+})
+
+
 
   # Compute planning
   variables <- reactive({
+    if(!is.null(input$file1))
+    {
      define.problem(input$start.week,
                     input$end.week,
-                    input$workload[1])#,
-    })
+                    input$workload[1],
+                    pre.planned = pre.planned(),
+                    pre.planned.start = input$pre.planned.weeks[1],
+                    pre.planned.end = input$pre.planned.weeks[2],
+                    c1 = input$c1,
+                    c2 = input$c2)#,
+    }
+    else
+    {
+      define.problem(input$start.week,
+                     input$end.week,
+                     input$workload[1])#,
+    }
+  })
 
 
   planning.solver <- eventReactive(input$go, {
@@ -166,16 +202,9 @@ server <- function(input, output) {
   output$downloadData <- downloadHandler(
     filename = 'suggested-planning.csv',
     content = function(file) {
-      write.table(planning.solver(), file, sep = ';')
+      write.table(planning.solver()$planning, file, sep = ';')
     })
 
-
-#  output$a_weeks <- renderPrint({
-#      res <- lapply(1:5, function(i) {
-#         input[[paste0('a', i)]]
-#         })
-#      str(setNames(res, paste0('myWeek', 1:5)))
-#    })
 
   lapply(1:10, function(i) {
       output[[paste0('weekUI', i)]] <- renderUI({
@@ -185,20 +214,6 @@ server <- function(input, output) {
                     value = c(variables()$workforce.min.values[i], variables()$workforce.min.values[i] + deltaFourchette))
                     })
     })
-
-#  output$weekSelector1 <- renderUI({
-#    sliderInput(names[1], displayNames[1],
-#                min = 40,
-#                max = variables()$workforce.min.limits[1],
-#                value = c(variables()$workforce.min.values[1], variables()$workforce.min.values[1] + deltaFourchette))
-#    })
-#
-#  output$weekSelector2 <- renderUI({
-#    sliderInput(names[2], displayNames[2],
-#                min = 40,
-#                max = variables()$workforce.min.limits[2],
-#                value = c(variables()$workforce.min.values[2], variables()$workforce.min.values[2] + deltaFourchette))
-#    })
 
 }
 
