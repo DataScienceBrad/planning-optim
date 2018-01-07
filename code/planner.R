@@ -55,25 +55,25 @@ define.problem <- function(start.week,
     cost.vector = cost.vector.rest.days(rest.preferences, df, penalty.vector, n.week)
 
     # Append the constraints
-    const.matrix = rbind(workload$const.matrix,
+    const.matrix = rbind(workforce.min$const.matrix,
+                         workload$const.matrix,
                          holiday$const.matrix,
                          binaries$const.matrix,
                          unfulfilled$const.matrix,
-                         workforce.min$const.matrix,
                          workforce.max$const.matrix)#,
                          #saturday$const.matrix)
-    const.dir = c(workload$const.dir,
+    const.dir = c(workforce.min$const.dir,
+                  workload$const.dir,
                   holiday$const.dir,
                   binaries$const.dir,
                   unfulfilled$const.dir,
-                  workforce.min$const.dir,
                   workforce.max$const.dir)#,
                   #saturday$const.dir)
-    const.val = c(workload$const.value,
+    const.val = c(workforce.min$const.value,
+                  workload$const.value,
                   holiday$const.value,
                   binaries$const.val,
                   unfulfilled$const.value,
-                  workforce.min$const.value,
                   workforce.max$const.value)#,
                   #saturday$const.value)
 
