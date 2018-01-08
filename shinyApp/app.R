@@ -36,16 +36,16 @@ deltaFourchette = 20
 ui <- fluidPage(
 
   # Input: Select a file ----
-  fileInput("file1", "Choose CSV File",
+  fileInput("file1", "Choisir un planning à uploader (format CSV)",
             multiple = FALSE,
             accept = c("text/csv",
                      "text/comma-separated-values,text/plain",
                      ".csv")),
 
   # Button
-  downloadButton("downloadData", "Download Planning"),
+  downloadButton("downloadData", "Télécharger le résultat"),
 
-  actionButton("go", "Go"),
+  actionButton("go", "Lancer le calcul"),
 
   # App title ----
   titlePanel("Sliders"),
@@ -59,47 +59,55 @@ ui <- fluidPage(
       verbatimTextOutput("workloadValue"),
 
       # Input: Simple integer interval ----
-      sliderInput("start.week", "Start week:",
+      sliderInput("start.week", "Première semaine du planning:",
                   min = 1, max = 52,
                   value = 1),
 
       # Input: Decimal interval with step value ----
-      sliderInput("end.week", "End week:",
+      sliderInput("end.week", "Dernière semaine du planning:",
                   min = 1, max = 52,
                   value = 10),
 
-      sliderInput('pre.planned.weeks', 'Pre-planned weeks:',
-                  min = 1,
+      sliderInput('pre.planned.weeks', 'Semaines pré-plannifiées dans le fichier uploadé:',
+                  min = 0,
                   max = 52, step = 1,
-                  value = c(1, 7)),
+                  value = c(2, 7)),
 
-      sliderInput('pre.planned.weeks', 'Pre-planned weeks:',
-                  min = 1,
+      sliderInput('history.weeks', "Semaines d'historique figé:",
+                  min = 0,
                   max = 52, step = 1,
-                  value = c(1, 7)),
+                  value = 1),
 
-      sliderInput('workload', 'Individual workload margin:',
+      sliderInput('workload', 'Fourchette de tolerence pour la charge de travail totale individuelle par rapport au standard:',
                   min = 0.5,
                   max = 1.3, step = 0.01,
                   value = c(0.97, 1.03)),
 
-      sliderInput('c1', "Cout d'une annulation de vacation programmee",
+      sliderInput('c1', "Cout d'une annulation de vacation programmée",
                   min = 1, max = 20, step = 0.5,
                   value = 5),
 
-      sliderInput('c2', "Cout d'une programmation tardive",
+      sliderInput('c2', "Cout d'une programmation de vacation tardive",
                   min = 1, max = 20, step = 0.5,
-                  value = 2)
+                  value = 2),
+
+      sliderInput('unbalanced.factor', "Facteur d'équilibrage de la charge de travail",
+                  min = 0, max = 5, step = 0.01,
+                  value = 0.1),
+
+      sliderInput('max.unfulfilled', "Nombre de contraintes non-respectées maximum",
+                  min = 0, max = 40, step = 1,
+                  value = 20),
+
+# weekly sliders
+      lapply(1:52, function(i) {
+                    uiOutput(paste0('weekUI', i))
+                  })
     ),
 
     mainPanel(
 
       tableOutput("pre.planned.table"),
-
-      lapply(1:10, function(i) {
-        uiOutput(paste0('weekUI', i))
-      }),
-
 
 
       # Output: Table summarizing the values entered ----
@@ -149,11 +157,14 @@ output$pre.planned.table <- renderTable({
      define.problem(input$start.week,
                     input$end.week,
                     input$workload[1],
+                    unbalanced.factor = input$unbalanced.factor,
                     pre.planned = pre.planned(),
                     pre.planned.start = input$pre.planned.weeks[1],
                     pre.planned.end = input$pre.planned.weeks[2],
                     c1 = input$c1,
-                    c2 = input$c2)#,
+                    c2 = input$c2,
+                    history.end.week = input$history.weeks,
+                    max.unfulfilled = input$max.unfulfilled)#,
     }
     else
     {
@@ -165,15 +176,14 @@ output$pre.planned.table <- renderTable({
 
 
   planning.solver <- eventReactive(input$go, {
-
     modified.const.val = variables()$const.val
-#    for (week in input$start.week:input$end.week)
-#    {
-#      modified.const.val[week - input$start.week + 1] = input[[names[week]]]
-#    }
-    modified.const.val[1] = input[['weekSel1']]
-
-    print(modified.const.val)
+    for (week in (input$history.weeks + 1):input$end.week)
+    {
+      modified.const.val[week - input$start.week + 1] = input[[paste0('weekSel', week)]][1]
+    }
+#    modified.const.val[1] = input[['weekSel1']][1]
+#    modified.const.val[2] = input[['weekSel2']][1]
+#    browser()
     start_time <- Sys.time()
     sol = lp(objective.in = variables()$cost.vector,
              const.mat = variables()$const.mat,
@@ -206,13 +216,17 @@ output$pre.planned.table <- renderTable({
     })
 
 
-  lapply(1:10, function(i) {
+  lapply(1:52, function(i) {
       output[[paste0('weekUI', i)]] <- renderUI({
-        sliderInput(paste0('weekSel', i), paste0('Workforce week ', i),
+
+        if(!is.na(variables()$workforce.min.limits[i]))
+        {
+          sliderInput(paste0('weekSel', i), paste0('Fourchette de vacations de la semaine ', i),
                     min = 40,
                     max = variables()$workforce.min.limits[i],
                     value = c(variables()$workforce.min.values[i], variables()$workforce.min.values[i] + deltaFourchette))
-                    })
+        }
+      })
     })
 
 }

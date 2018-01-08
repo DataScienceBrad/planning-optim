@@ -10,28 +10,37 @@ workload.min.factor = 0.6
 define.problem <- function(start.week,
                            end.week,
                            workload.min.factor,
+                           workload.max.factor,
+                           # balanceing constraint
+                           unbalanced.factor = 1 / 10,
+                           # pre-planning
                            pre.planned = NA,
                            pre.planned.start = NA,
                            pre.planned.end = NA,
                            c1 = 5,
-                           c2 = 2)#,
+                           c2 = 2,
+                           history.end.week = 0,
+                           max.unfulfilled = 20)#,
+
         #            workload.max.factor)
 {
     dataPlanningFile = paste(folder, "data/dataPlanning.csv", sep = '')
     holiday.data = troncate.holiday.data(extract.holiday.data(), start.week, end.week)
     radiologues.data = extract.data(file.location = dataPlanningFile, saturday.penalty = 0)
     df = radiologues.data$df
-    # global vars
     n.radiologues = nrow(df)
+    # global vars
     history.vector = 1:n.radiologues
     penalty.factor = 1
-    workforce.min.factor = 0.6 # proportion de travail minimal total hebdomadaire / standard
     workforce.max.factor = 1
-    unbalanced.factor = 1 / 10
     num.bin.solns = 1
-    max.unfulfilled = 20
+    #workload min default values
+    full.force.threshold = 75
+    workforce.min.factor = 0.6
+    max.minimum = 90
     n.week = end.week - start.week + 1
     calendar.length = n.week * 7
+
 
     rest.preferences = radiologues.data$rest.preferences
     rownames(holiday.data) = rownames(rest.preferences)
@@ -41,8 +50,8 @@ define.problem <- function(start.week,
     # one single line
     holiday = holiday.constraint(holiday.data)
     # one line per week
-    workforce.min = workforce.min.constraint(df, start.week, end.week, full.force.threshold = 75, workforce.min.factor = 0.6, max.minimum = 90)
-    workforce.max = workforce.max.constraint(df, n.week, workforce.factor = workforce.max.factor)
+    workforce.min = workforce.min.constraint(df, start.week, end.week, full.force.threshold, workforce.min.factor, max.minimum)
+#    workforce.max = workforce.max.constraint(df, n.week, workforce.factor = workforce.max.factor)
 
     # one line per radiologue
 #    workload = workload.constraint(df, n.week = n.week, workload.min.factor, workload.max.factor)
@@ -62,6 +71,7 @@ define.problem <- function(start.week,
     if(!is.null(dim(pre.planned)))
     {
       cost.vector.change = cost.vector.changes(pre.planned, first.week = pre.planned.start, last.week = pre.planned.end, c1 = c1, c2 = c2)
+      cost.vector.change = c(cost.vector.change, rep(0, length(cost.vector) - length(cost.vector.change)))
       cost.vector = cost.vector + cost.vector.change
     }
 
@@ -70,23 +80,35 @@ define.problem <- function(start.week,
                          workload$const.matrix,
                          holiday$const.matrix,
                          binaries$const.matrix,
-                         unfulfilled$const.matrix,
-                         workforce.max$const.matrix)#,
+                         unfulfilled$const.matrix)#,
+  #                       workforce.max$const.matrix)#,
                          #saturday$const.matrix)
     const.dir = c(workforce.min$const.dir,
                   workload$const.dir,
                   holiday$const.dir,
                   binaries$const.dir,
-                  unfulfilled$const.dir,
-                  workforce.max$const.dir)#,
+                  unfulfilled$const.dir)#,
+#                  workforce.max$const.dir)#,
                   #saturday$const.dir)
     const.val = c(workforce.min$const.value,
                   workload$const.value,
                   holiday$const.value,
-                  binaries$const.val,
-                  unfulfilled$const.value,
-                  workforce.max$const.value)#,
+                  binaries$const.value,
+                  unfulfilled$const.value)#,
+#                  workforce.max$const.value)#,
                   #saturday$const.value)
+
+    if(history.end.week > 0)
+    {
+      history = force.history.constraint(pre.planned, history.end.week)
+      ncol.to.add = ncol(const.matrix) - ncol(history$const.matrix)
+      extended.history.const.matrix = cbind(history$const.matrix, matrix(rep(0, nrow(history$const.matrix) * ncol.to.add), nrow(history$const.matrix)))
+      const.matrix = rbind(const.matrix, extended.history.const.matrix)
+      const.val = c(const.val, history$const.value)
+      const.dir = c(const.dir, history$const.dir)
+    }
+
+
 
     # Artificial variables are used to add the absolute value in the balance constraint
     # for the weeks with no work at all (full weeks of holiday) it does not work.

@@ -235,7 +235,7 @@ workforce.min.constraint2 <- function(df, n.week, workforce.factor)
   return(list("const.matrix" = const.matrix, "const.dir" = const.dir, "const.value" = const.value))
 }
 
-workforce.max.constraint <- function(df, n.week, workforce.factor)
+workforce.max.constraint <- function(df, n.week, workforce.max.vector)
 {
   n.radiologue = nrow(df)
   calendar.length = n.week * 7
@@ -358,13 +358,15 @@ max.unfulfilled.constraint <- function(rest.preferences,
 # history solution is formatted a planning solution
 # if the length of it is 29*14, it will be assumed
 # that these are the first two weeks of the year, to be set
-force.history.constraint <- function(history.solution)
+force.history.constraint <- function(pre.planned, history.end.week)
 {
+  history.solution = c(pre.planned[1:(history.end.week * 7)])
+  history.solution = Reduce(c, history.solution)
   n.constraints = length(history.solution)
   const.matrix = diag(n.constraints)
   rsplit <- as.list(as.data.frame(t(const.matrix)))
   const.matrix = do.call(rbind,rsplit)
-  const.value = c(history.solution)
+  const.value = Reduce(c, history.solution)
   const.dir = rep("==", n.constraints)
   return(list("const.matrix" = const.matrix, "const.dir" = const.dir, "const.value" = const.value))
 }
