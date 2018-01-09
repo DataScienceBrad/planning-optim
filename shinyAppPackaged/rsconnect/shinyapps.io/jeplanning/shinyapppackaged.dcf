@@ -1,0 +1,10 @@
+name: shinyapppackaged
+title:
+username:
+account: jeplanning
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 254811
+bundleId: 1166993
+url: https://jeplanning.shinyapps.io/shinyapppackaged/
+when: 1515428461.53646
