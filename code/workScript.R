@@ -175,22 +175,3 @@ workforce.min$const.matrix %*% solution
 planning
 
 #write.table(planning, 'suggested-planning.csv', sep = ';')
-
-
-
-
-# to do:
-# samedis
-# connect input to planner
-# workload per radiologue, connect with DF
-# feedback on computation temination
-# connect with real past schedule 
-
-# done
-# solution download
-
-
-#a = 29*7 - compute.weekly.days.off(1,52)
-#source('optim.R')
-#minis = get.weekly.minimums(1, 52)
-#workforce.min.constraint(df, 1, 52)$const.value
