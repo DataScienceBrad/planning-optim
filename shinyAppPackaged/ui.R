@@ -48,7 +48,7 @@ fluidPage(
 # weekly sliders
       lapply(1:52, function(i) {
                     uiOutput(paste0('weekUI', i))
-                  })),
+                  }),
 
       sliderInput('max.unfulfilled', "Nombre de contraintes non-respectées maximum",
                   min = 0, max = 40, step = 1,
@@ -69,9 +69,9 @@ fluidPage(
 
       sliderInput('unbalanced.factor', "Facteur d'équilibrage de la charge de travail",
                   min = 0, max = 2, step = 0.01,
-                  value = 0.1),
+                  value = 0.1)
 
-
+    ),
 
 
     mainPanel(
