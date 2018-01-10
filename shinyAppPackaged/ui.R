@@ -23,7 +23,7 @@ fluidPage(
     # Sidebar to demonstrate various slider options ----
     sidebarPanel(
 
-  #    verbatimTextOutput("computation"),
+      verbatimTextOutput("computation"),
 
       # Input: Simple integer interval ----
       sliderInput("start.week", "Première semaine du planning:",
@@ -45,6 +45,15 @@ fluidPage(
                   max = 52, step = 1,
                   value = 0),
 
+# weekly sliders
+      lapply(1:52, function(i) {
+                    uiOutput(paste0('weekUI', i))
+                  })),
+
+      sliderInput('max.unfulfilled', "Nombre de contraintes non-respectées maximum",
+                  min = 0, max = 40, step = 1,
+                  value = 20),
+
       sliderInput('workload', 'Fourchette de tolerence pour la charge de travail totale individuelle par rapport au standard:',
                   min = 0.5,
                   max = 1.3, step = 0.01,
@@ -59,18 +68,11 @@ fluidPage(
                   value = 2),
 
       sliderInput('unbalanced.factor', "Facteur d'équilibrage de la charge de travail",
-                  min = 0, max = 5, step = 0.01,
+                  min = 0, max = 2, step = 0.01,
                   value = 0.1),
 
-      sliderInput('max.unfulfilled', "Nombre de contraintes non-respectées maximum",
-                  min = 0, max = 40, step = 1,
-                  value = 20),
 
-# weekly sliders
-      lapply(1:52, function(i) {
-                    uiOutput(paste0('weekUI', i))
-                  })
-    ),
+
 
     mainPanel(
 

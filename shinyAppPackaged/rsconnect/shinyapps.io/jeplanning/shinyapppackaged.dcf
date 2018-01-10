@@ -5,6 +5,6 @@ account: jeplanning
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 254811
-bundleId: 1166993
+bundleId: 1169024
 url: https://jeplanning.shinyapps.io/shinyapppackaged/
-when: 1515428461.53646
+when: 1515521664.30472
